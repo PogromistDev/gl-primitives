@@ -10,6 +10,9 @@ const glPrimitiveType = document.getElementById("gl-primitive-type");
 
 const clearVertices = document.getElementById("clear-vertices");
 
+let showInfo = true;
+const infoText = "click to add vertex";
+
 let ctx;
 let vertices = [];
 
@@ -37,6 +40,7 @@ let vertices = [];
 	canvas.addEventListener("mousedown", e => {
 		if (e.button == 0) {
 			vertices.push(new Vertex2f(e.offsetX, e.offsetY));
+			showInfo = false;
 		}
 	});
 		
@@ -45,6 +49,16 @@ let vertices = [];
 
 		ctx.fillStyle = "black";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+		if (showInfo) {
+			ctx.fillStyle = "white";
+			ctx.font = "64px Arial";
+			let size = ctx.measureText(infoText);
+			let heightSize = ctx.measureText(infoText[0]);
+
+			ctx.translate(canvas.width/2, canvas.height/2);
+			ctx.fillText(infoText, -size.width/2, -heightSize.width/2);
+		}
 
 		ctx.fillStyle = "rgb(1, 255, 34)";
 		ctx.strokeStyle = "black";
