@@ -27,7 +27,13 @@ let vertices = [];
 	clearVertices.addEventListener("click", () => {
 		vertices = [];
 	});
-		
+	
+	canvas.addEventListener("mousemove", e => {
+		if (e.ctrlKey && e.button == 0) {
+			vertices.push(new Vertex2f(e.offsetX, e.offsetY));
+		}
+	});
+
 	canvas.addEventListener("mousedown", e => {
 		if (e.button == 0) {
 			vertices.push(new Vertex2f(e.offsetX, e.offsetY));
@@ -206,6 +212,62 @@ let vertices = [];
 						ctx.lineTo(firstVertex.x, firstVertex.y);
 						ctx.stroke();
 						ctx.fill();
+					}
+				}
+			}
+			break;
+
+			case "GL_QUAD_STRIP": {
+				if (vertices.length > 3) {
+					let firstVertex = vertices[0];
+					let secondVertex = vertices[1];
+					let thirdVertex = vertices[2];
+					let fourthVertex = vertices[3];
+
+					ctx.beginPath();
+					ctx.moveTo(firstVertex.x, firstVertex.y);
+					ctx.lineTo(secondVertex.x, secondVertex.y);
+					ctx.lineTo(thirdVertex.x, thirdVertex.y);
+					ctx.lineTo(firstVertex.x, firstVertex.y);
+					ctx.fill();
+					ctx.stroke();
+
+					ctx.beginPath();
+					ctx.moveTo(thirdVertex.x, thirdVertex.y);
+					ctx.lineTo(fourthVertex.x, fourthVertex.y);
+					ctx.lineTo(secondVertex.x, secondVertex.y);
+					ctx.fill();
+					ctx.stroke();
+					
+					for (let i = 4; i < vertices.length; i++) {
+
+						let prevPrevVertex = vertices[i - 2];
+						let prevVertex = vertices[i - 1];
+						let currentVertex = vertices[i];
+
+						let offset = (i - 4) % 2;
+
+						if (offset == 0) {
+							if (vertices[i + 1]) {
+								ctx.beginPath();
+								ctx.moveTo(prevVertex.x, prevVertex.y);
+								ctx.lineTo(currentVertex.x, currentVertex.y);
+								ctx.lineTo(prevPrevVertex.x, prevPrevVertex.y);
+								ctx.fill();
+								ctx.stroke();
+							}
+						}
+
+						if (offset == 1) {
+							if (vertices[i - 1]) {
+								ctx.beginPath();
+								ctx.moveTo(prevVertex.x, prevVertex.y);
+								ctx.lineTo(currentVertex.x, currentVertex.y);
+								ctx.lineTo(prevPrevVertex.x, prevPrevVertex.y);
+								ctx.fill();
+								ctx.stroke();
+							}
+						}
 					}
 				}
 			}
