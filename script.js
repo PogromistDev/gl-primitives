@@ -53,11 +53,11 @@ let vertices = [];
 		if (showInfo) {
 			ctx.fillStyle = "white";
 			ctx.font = "64px Arial";
-			let size = ctx.measureText(infoText);
-			let heightSize = ctx.measureText(infoText[0]);
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
 
 			ctx.translate(canvas.width/2, canvas.height/2);
-			ctx.fillText(infoText, -size.width/2, -heightSize.width/2);
+			ctx.fillText(infoText, 0, 0);
 		}
 
 		ctx.fillStyle = "rgb(1, 255, 34)";
