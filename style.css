@@ -1,3 +1,57 @@
+@media (prefers-color-scheme: light) {
+	header {
+		background: rgba(255, 255, 255, 0.9);
+		color: black;
+	}
+
+	select {
+		color: black;
+		background: white;
+		border: 1px solid lightgray;
+	}
+
+	select:active {
+		background: rgb(232, 232, 232);
+	}
+
+	button {
+		background: white;
+		color: black;
+		border: 1px solid lightgray;
+	}
+
+	button:active {
+		background: rgb(232, 232, 232);
+	}
+}
+
+
+@media (prefers-color-scheme: dark) {
+	header {
+		color: white;
+	}
+
+	select {
+		color: white;
+		background: rgb(41, 41, 41);
+		border: 1px solid white;
+	}
+
+	select:active {
+		background: rgb(33, 33, 33);
+	}
+
+	button {
+		background: rgb(41, 41, 41);
+		color: white;
+		border: 1px solid white;
+	}
+
+	button:active {
+		background: rgb(33, 33, 33);
+	}
+}
+
 body {
 	margin: 0px;
 	overflow: hidden;
@@ -9,23 +63,18 @@ header {
 	box-sizing: border-box;
 	padding: 10px;
 	width: 100%;
-	background: rgba(0, 0, 0, 0.5);
-	color: white;
-}
-
-button {
-	margin-left: 5px;
-	width: 128px;
-	height: 32px;
-	border: 1px solid lightgray;
-	border-radius: 16px;
-	background: rgb(41, 41, 41);
-	color: white;
 }
 
 select {
+	outline: none;
 	height: 32px;
 	border-radius: 16px;
-	color: white;
-	background: rgb(41, 41, 41);
+}
+
+button {
+	outline: none;
+	margin-left: 5px;
+	width: 128px;
+	height: 32px;
+	border-radius: 16px;
 }
