@@ -94,8 +94,8 @@ canvas.addEventListener("mousemove", e => {
 });
 
 Promise.all([
-	fetch("/shaders/vertex.shader"),
-	fetch("/shaders/fragment.shader")
+	fetch("shaders/vertex.shader"),
+	fetch("shaders/fragment.shader")
 ])
 .then(async shaders => {
 	adjustCanvasSize();
