@@ -1,4 +1,9 @@
 @media (prefers-color-scheme: light) {
+
+	body {
+		background: white;
+	}
+
 	header {
 		background: rgba(255, 255, 255, 0.9);
 		color: black;
@@ -27,6 +32,11 @@
 
 
 @media (prefers-color-scheme: dark) {
+
+	body {
+		background: black;
+	}
+
 	header {
 		color: white;
 	}
