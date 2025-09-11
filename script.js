@@ -1,9 +1,15 @@
 
 const canvas = document.getElementById("canv");
+const canvas_info = document.getElementById("canv_info");
+
 const gl = canvas.getContext("webgl");
+const ctx = canvas_info.getContext("2d");
 const glPrimitiveType = document.getElementById("gl-primitive-type");
 
 const clearVertices = document.getElementById("clear-vertices");
+
+let showInfo = true;
+const infoText = "click to add vertex";
 
 let vertexShaderString = null;
 let fragmentShaderString = null;
@@ -78,9 +84,14 @@ window.addEventListener("keyup", e => {
 canvas.addEventListener("mousedown", e => {
 	if (hold) m = true;
 	if (!hold) {
-		vertices.push((2 * e.clientX / canvas.width - 1) / scale.x - offset.x, -(2 * e.clientY / canvas.height - 1) / scale.y - offset.y);
+		vertices.push((2 * e.offsetX / canvas.width - 1) / scale.x - offset.x, -(2 * e.offsetY / canvas.height - 1) / scale.y - offset.y);
 
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+
+		if (e.button == 0 && showInfo) {
+			showInfo = false;
+			canvas_info.style.display = "none";
+		}
 	}
 });
 
@@ -89,8 +100,8 @@ canvas.addEventListener("mouseup", () => {
 });
 
 canvas.addEventListener("mousemove", e => {
-	mousePos.x = e.clientX;
-	mousePos.y = e.clientY;
+	mousePos.x = e.offsetX;
+	mousePos.y = e.offsetY;
 });
 
 Promise.all([
@@ -108,8 +119,8 @@ Promise.all([
 });
 
 function adjustCanvasSize() {
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
+	canvas.width = canvas_info.width = window.innerWidth;
+	canvas.height = canvas_info.height = window.innerHeight;
 	gl.viewport(0, 0, canvas.width, canvas.height);
 }
 
@@ -162,7 +173,22 @@ function initBuffers() {
 	gl.vertexAttribPointer(vertexAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 }
 
+function drawInfo() {
+	ctx.clearRect(0, 0, canvas_info.width, canvas_info.height);
+
+	ctx.fillStyle = "white";
+	ctx.font = "64px Arial";
+	let size = ctx.measureText(infoText);
+	let heightSize = ctx.measureText(infoText[0]);
+
+	ctx.resetTransform();
+	ctx.translate(canvas_info.width / 2, canvas_info.height / 2);
+	ctx.fillText(infoText, -size.width / 2, -heightSize.width / 2);
+}
+
 function draw() {
+	if (showInfo) drawInfo();
+
 	if (keys["a"]) offset.x -= 0.01;
 	if (keys["d"]) offset.x += 0.01;
 	if (keys["w"]) offset.y += 0.01;

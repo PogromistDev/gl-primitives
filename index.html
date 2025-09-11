@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<title>GL Primitives Demo</title>
-		<link rel="shortcut icon" href="favicon.png" type="image/png">
-		<link rel="stylesheet" type="text/css" href="style.css">
-		<script src="script.js" defer></script>
-	</head>
-	<body>
-		<header>
+
+<head>
+	<title>GL Primitives Demo</title>
+	<link rel="shortcut icon" href="favicon.png" type="image/png">
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<script src="script.js" defer></script>
+</head>
+
+<body>
+	<div id="app">
+		<div id="toolbar">
 			<span>GL Primitive:</span>
 			<select id="gl-primitive-type">
 				<option>GL_POINTS</option>
@@ -19,7 +22,12 @@
 				<option>GL_TRIANGLE_FAN</option>
 			</select>
 			<button id="clear-vertices">clear</button>
-		</header>
-		<canvas id="canv"></canvas>
-	</body>
+		</div>
+		<div id="content">
+			<canvas id="canv"></canvas>
+			<canvas id="canv_info"></canvas>
+		</div>
+	</div>
+</body>
+
 </html>

@@ -4,7 +4,7 @@
 		background: white;
 	}
 
-	header {
+	#toolbar {
 		background: rgba(255, 255, 255, 0.9);
 		color: black;
 	}
@@ -37,7 +37,7 @@
 		background: black;
 	}
 
-	header {
+	#toolbar {
 		color: white;
 	}
 
@@ -68,8 +68,14 @@ body {
 	user-select: none;
 }
 
-header {
-	position: fixed;
+#app {
+	display: grid;
+    width: 100vw;
+    height: 100vh;
+    grid-template-rows: 1fr 1fr;
+}
+
+#toolbar {
 	box-sizing: border-box;
 	padding: 10px;
 	width: 100%;
@@ -87,4 +93,10 @@ button {
 	width: 128px;
 	height: 32px;
 	border-radius: 16px;
+}
+
+#canv_info {
+	position: absolute;
+	left: 0px;
+	pointer-events: none;
 }
