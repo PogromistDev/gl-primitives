@@ -28,6 +28,10 @@
 	button:active {
 		background: rgb(232, 232, 232);
 	}
+
+	.button-active {
+		background: rgb(200, 200, 200);
+	}
 }
 
 
@@ -60,6 +64,10 @@
 	button:active {
 		background: rgb(33, 33, 33);
 	}
+
+	.button-active {
+		background: rgb(60, 60, 60);
+	}
 }
 
 body {
@@ -76,7 +84,11 @@ body {
 }
 
 #toolbar {
+	display: flex;
+    align-items: center;
+
 	box-sizing: border-box;
+
 	padding: 10px;
 	width: 100%;
 }
@@ -99,4 +111,31 @@ button {
 	position: absolute;
 	left: 0px;
 	pointer-events: none;
+}
+
+#tools {
+	display: inline-flex;
+	overflow: hidden;
+	border-radius: 16px;
+    border: 1px solid lightgray;
+	margin-left: 12px;
+	margin-right: 12px;
+}
+
+
+#tools button:last-child {
+	border: none;
+}
+
+#tools button {
+	border-width: 0px 1px 0px 0px;
+	border-right-color: lightgray;
+
+	border-radius: 0px;
+
+	margin: 0px;
+	max-width: 64px;
+	text-align: center;
+
+	cursor: pointer;
 }
