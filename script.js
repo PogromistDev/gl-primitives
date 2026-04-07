@@ -2,7 +2,7 @@
 const canvas = document.getElementById("canv");
 const canvas_info = document.getElementById("canv_info");
 
-const gl = canvas.getContext("webgl", { antialias: false });
+const gl = canvas.getContext("webgl", { alpha: false, antialias: false });
 const ctx = canvas_info.getContext("2d");
 const glPrimitiveType = document.getElementById("gl-primitive-type");
 
@@ -13,47 +13,47 @@ const toolDraw = document.getElementById("tool-draw");
 const toolMove = document.getElementById("tool-move");
 const snapToGridCheckbox = document.getElementById("snap-to-grid");
 
-let showInfo = true;
+var showInfo = true;
 const infoText = "click to add vertex";
 
-let vertexShaderString = null;
-let fragmentShaderString = null;
+var vertexShaderString = null;
+var fragmentShaderString = null;
 
-let vertexShader = null;
-let fragmentShader = null;
+var vertexShader = null;
+var fragmentShader = null;
 
-let shaderProgram = null;
+var shaderProgram = null;
 
-let vertexAttributeLocation = 0;
+var vertexAttributeLocation = 0;
 
-let offsetUniformLocation = 0;
-let scaleUniformLocation = 0;
+var offsetUniformLocation = 0;
+var scaleUniformLocation = 0;
 
-let colorUniformLocation = 0;
+var colorUniformLocation = 0;
 
-let keys = {};
+var keys = {};
 
-let mode = 0;
-let ctrlPressed = false;
-let spacePressed = false;
-let shiftPressed = false;
+var mode = 0;
+var ctrlPressed = false;
+var spacePressed = false;
+var shiftPressed = false;
 
-let mousePos = {
+var mousePos = {
 	x: 0,
 	y: 0
 };
 
-let lastMousePos = {
+var lastMousePos = {
 	x: 0,
 	y: 0
 };
 
-let offset = {
+var offset = {
 	x: 0.0,
 	y: 0.0
 };
 
-let scale = {
+var scale = {
 	x: 0.2,
 	y: 0.2
 };
@@ -61,30 +61,30 @@ let scale = {
 const minScale = 0.05;
 const maxScale = 20.0;
 
-let vertices = [];
-let selectedVertices = [];
+var vertices = [];
+var selectedVertices = [];
 
-let squareVerticesBuffer = null;
+var squareVerticesBuffer = null;
 
-let currentTool = 'draw';
-let previousTool = 'draw';
-let isDragging = false;
-let hasMoved = false;
-let rectSelectStart = null;
-let isDraggingMove = false;
-let snappingEnabled = false;
-let zoomFromCursor = false;
-let panSnapEnabled = false;
+var currentTool = 'draw';
+var previousTool = 'draw';
+var isDragging = false;
+var hasMoved = false;
+var rectSelectStart = null;
+var isDraggingMove = false;
+var snappingEnabled = false;
+var zoomFromCursor = false;
+var panSnapEnabled = false;
 
 function deleteSelected() {
-    if (selectedVertices.length === 0) return;
-    // sort descending to remove from end
-    selectedVertices.sort((a,b) => b - a);
-    for (let idx of selectedVertices) {
-        vertices.splice(idx * 2, 2);
-    }
-    selectedVertices = [];
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+	if (selectedVertices.length === 0) return;
+	// sort descending to remove from end
+	selectedVertices.sort((a, b) => b - a);
+	for (let idx of selectedVertices) {
+		vertices.splice(idx * 2, 2);
+	}
+	selectedVertices = [];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 }
 
 function setActiveTool(activeButton) {
@@ -154,8 +154,8 @@ window.addEventListener("resize", e => {
 window.addEventListener("keydown", e => {
 	keys[e.key] = true;
 
-	if (e.key == "u") mode = Math.min(mode+1, 6);
-	if (e.key == "j") mode = Math.max(mode-1, 0);
+	if (e.key == "u") mode = Math.min(mode + 1, 6);
+	if (e.key == "j") mode = Math.max(mode - 1, 0);
 
 	if (e.key === 'a' && e.ctrlKey) {
 		e.preventDefault();
@@ -333,7 +333,7 @@ function finalizeDragOperation() {
 		offset.x = Math.round(offset.x / step) * step;
 		offset.y = Math.round(offset.y / step) * step;
 	}
-	
+
 	isDraggingMove = false;
 	if (rectSelectStart) {
 		if (hasMoved) {
@@ -346,7 +346,7 @@ function finalizeDragOperation() {
 			let newSelected = [];
 			for (let i = 0; i < vertices.length; i += 2) {
 				const screenX = ((vertices[i] + offset.x) * scale.x + 1) * canvas.width / 2;
-				const screenY = ((-vertices[i+1] - offset.y) * scale.y + 1) * canvas.height / 2;
+				const screenY = ((-vertices[i + 1] - offset.y) * scale.y + 1) * canvas.height / 2;
 				if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY) {
 					newSelected.push(i / 2);
 				}
@@ -364,8 +364,8 @@ function finalizeDragOperation() {
 			let minDist = Infinity;
 			for (let i = 0; i < vertices.length; i += 2) {
 				const dx = vertices[i] - worldX;
-				const dy = vertices[i+1] - worldY;
-				const dist = Math.sqrt(dx*dx + dy*dy);
+				const dy = vertices[i + 1] - worldY;
+				const dist = Math.sqrt(dx * dx + dy * dy);
 				if (dist < minDist) {
 					minDist = dist;
 					nearestIndex = i / 2;
@@ -429,17 +429,17 @@ Promise.all([
 	fetch("shaders/vertex.shader"),
 	fetch("shaders/fragment.shader")
 ])
-.then(async shaders => {
-	adjustCanvasSize();
+	.then(async shaders => {
+		adjustCanvasSize();
 
-	initializeWebGL();
-	await makeShaders(shaders);
-	initBuffers();
+		initializeWebGL();
+		await makeShaders(shaders);
+		initBuffers();
 
-	setActiveTool(toolDraw);
+		setActiveTool(toolDraw);
 
-	draw();
-});
+		draw();
+	});
 
 function adjustCanvasSize() {
 	canvas.width = canvas_info.width = window.innerWidth;
@@ -458,7 +458,7 @@ async function makeShaders(shaders) {
 	vertexShaderString = await shaders[0].text();
 	fragmentShaderString = await shaders[1].text();
 
-	vertexShader =  gl.createShader(gl.VERTEX_SHADER);
+	vertexShader = gl.createShader(gl.VERTEX_SHADER);
 	fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
 	gl.shaderSource(vertexShader, vertexShaderString);
@@ -502,10 +502,10 @@ function formatNumber(value) {
 	return Number(value.toFixed(3));
 }
 
-function drawOutlinedText(text, x, y, fillStyle = "white", strokeStyle = "black", font = "14px Arial") {
+function drawOutlinedText(text, x, y, fillStyle = "white", strokeStyle = "black", font = "14px Arial", textAlign="left", textBaseline="top") {
 	ctx.font = font;
-	ctx.textAlign = "left";
-	ctx.textBaseline = "top";
+	ctx.textAlign = textAlign;
+	ctx.textBaseline = textBaseline;
 	ctx.fillStyle = fillStyle;
 	ctx.strokeStyle = strokeStyle;
 	ctx.lineWidth = 3;
@@ -518,13 +518,10 @@ function drawInfo() {
 	ctx.clearRect(0, 0, canvas_info.width, canvas_info.height);
 
 	if (showInfo) {
-		ctx.font = "64px Arial";
-		let size = ctx.measureText(infoText);
-		let heightSize = ctx.measureText(infoText[0]);
+		const x = canvas_info.width / 2;
+		const y = canvas_info.height / 2;
 
-		ctx.translate(canvas_info.width / 2, canvas_info.height / 2);
-		drawOutlinedText(infoText, -size.width / 2, -heightSize.width / 2, "white", "black", "64px Arial");
-		ctx.resetTransform();
+		drawOutlinedText(infoText, x, y, "white", "black", "64px Arial", "center", "middle");
 	}
 
 	const worldX = (2 * mousePos.x / canvas.width - 1) / scale.x - offset.x;
@@ -537,12 +534,13 @@ function drawInfo() {
 	const cursorText = `Cursor: ${formatNumber(worldX)}, ${formatNumber(worldY)}`;
 	const snapText = snappingEnabled ? `Snapped: ${formatNumber(snapped[0])}, ${formatNumber(snapped[1])}` : null;
 	let selectionText = `Selected: ${selectedVertices.length}`;
+
 	if (selectedVertices.length === 1) {
 		const idx = selectedVertices[0];
-		selectionText += ` (${formatNumber(vertices[idx*2])}, ${formatNumber(vertices[idx*2+1])})`;
+		selectionText += ` (${formatNumber(vertices[idx * 2])}, ${formatNumber(vertices[idx * 2 + 1])})`;
 	} else if (selectedVertices.length > 1) {
 		const idx = selectedVertices[0];
-		selectionText += ` | first: ${formatNumber(vertices[idx*2])}, ${formatNumber(vertices[idx*2+1])}`;
+		selectionText += ` | first: ${formatNumber(vertices[idx * 2])}, ${formatNumber(vertices[idx * 2 + 1])}`;
 	}
 
 	const padding = 10;
@@ -632,6 +630,53 @@ function draw() {
 
 	gl.useProgram(shaderProgram);
 
+	// draw grid
+	let gridVertices = [];
+	const minX = -1 / scale.x - offset.x;
+	const maxX = 1 / scale.x - offset.x;
+	const minY = -1 / scale.y - offset.y;
+	const maxY = 1 / scale.y - offset.y;
+	const step = Math.pow(10, Math.floor(Math.log10(1 / Math.max(scale.x, scale.y))));
+
+	for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) {
+		gridVertices.push(x, minY, x, maxY);
+	}
+
+	for (let y = Math.floor(minY / step) * step; y <= maxY; y += step) {
+		gridVertices.push(minX, y, maxX, y);
+	}
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(gridVertices), gl.DYNAMIC_DRAW);
+	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.2); // very subtle white
+	gl.drawArrays(gl.LINES, 0, gridVertices.length / 2);
+
+	// draw finer grid (one level smaller)
+	let fineGridVertices = [];
+	const fineStep = step / 10;
+
+	for (let x = Math.floor(minX / fineStep) * fineStep; x <= maxX; x += fineStep) {
+		fineGridVertices.push(x, minY, x, maxY);
+	}
+
+	for (let y = Math.floor(minY / fineStep) * fineStep; y <= maxY; y += fineStep) {
+		fineGridVertices.push(minX, y, maxX, y);
+	}
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fineGridVertices), gl.DYNAMIC_DRAW);
+	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.1); // more transparent
+	gl.drawArrays(gl.LINES, 0, fineGridVertices.length / 2);
+
+	// draw origin
+	let originVertices = [-0.1, 0, 0.1, 0, 0, -0.1, 0, 0.1];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(originVertices), gl.DYNAMIC_DRAW);
+	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.3); // subtle white
+	gl.drawArrays(gl.LINES, 0, 4);
+
+	// set ARRAY_BUFFER to vertices
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+
+	// draw primitives
+
 	gl.uniform2f(offsetUniformLocation, offset.x, offset.y);
 	gl.uniform2f(scaleUniformLocation, scale.x, scale.y);
 
@@ -645,7 +690,7 @@ function draw() {
 	if (selectedVertices.length > 0) {
 		let selectedBuffer = [];
 		for (let idx of selectedVertices) {
-			selectedBuffer.push(vertices[idx*2], vertices[idx*2+1]);
+			selectedBuffer.push(vertices[idx * 2], vertices[idx * 2 + 1]);
 		}
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(selectedBuffer), gl.DYNAMIC_DRAW);
 		gl.uniform4f(colorUniformLocation, 1.0, 0.0, 0.0, 1.0);
@@ -654,44 +699,8 @@ function draw() {
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 	}
 
-	// draw grid
-	let gridVertices = [];
-	const minX = -1 / scale.x - offset.x;
-	const maxX = 1 / scale.x - offset.x;
-	const minY = -1 / scale.y - offset.y;
-	const maxY = 1 / scale.y - offset.y;
-	const step = Math.pow(10, Math.floor(Math.log10(1 / Math.max(scale.x, scale.y))));
-	for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) {
-		gridVertices.push(x, minY, x, maxY);
-	}
-	for (let y = Math.floor(minY / step) * step; y <= maxY; y += step) {
-		gridVertices.push(minX, y, maxX, y);
-	}
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(gridVertices), gl.DYNAMIC_DRAW);
-	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 0.2); // very subtle black
-	gl.drawArrays(gl.LINES, 0, gridVertices.length / 2);
-
-	// draw finer grid (one level smaller)
-	let fineGridVertices = [];
-	const fineStep = step / 10;
-	for (let x = Math.floor(minX / fineStep) * fineStep; x <= maxX; x += fineStep) {
-		fineGridVertices.push(x, minY, x, maxY);
-	}
-	for (let y = Math.floor(minY / fineStep) * fineStep; y <= maxY; y += fineStep) {
-		fineGridVertices.push(minX, y, maxX, y);
-	}
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fineGridVertices), gl.DYNAMIC_DRAW);
-	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 0.1); // more transparent
-	gl.drawArrays(gl.LINES, 0, fineGridVertices.length / 2);
-
-	// draw origin
-	let originVertices = [-0.1, 0, 0.1, 0, 0, -0.1, 0, 0.1];
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(originVertices), gl.DYNAMIC_DRAW);
-	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 0.3); // subtle black
-	gl.drawArrays(gl.LINES, 0, 4);
-
-	// draw bounding box for move and select tools
-	if ((currentTool === 'move' || currentTool === 'select') && selectedVertices.length > 1) {
+	// draw bounding box of selected vertices
+	if ((["pan", "move", "select"].includes(currentTool)) && selectedVertices.length > 1) {
 		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 		for (let idx of selectedVertices) {
 			const x = vertices[idx * 2];
@@ -754,9 +763,6 @@ function draw() {
 		gl.uniform2f(scaleUniformLocation, savedScaleX, savedScaleY);
 	}
 
-	// restore buffer
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
-
 	// draw transparent dot under cursor in draw tool
 	if (currentTool === 'draw') {
 		let dotX = (2 * mousePos.x / canvas.width - 1) / scale.x - offset.x;
@@ -768,8 +774,6 @@ function draw() {
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dotVertices), gl.DYNAMIC_DRAW);
 		gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.5); // white with alpha
 		gl.drawArrays(gl.POINTS, 0, 1);
-		// restore buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 	}
 
 	requestAnimationFrame(draw);
