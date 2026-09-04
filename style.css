@@ -1,79 +1,97 @@
+:root {
+	color-scheme: light dark;
+	--background: rgb(240, 240, 240);
+	--surface: rgba(255, 255, 255, 0.9);
+	--foreground: black;
+	--control-background: white;
+	--control-border: lightgray;
+	--control-active: rgb(232, 232, 232);
+	--button-active: rgb(200, 200, 200);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--background: rgb(20, 20, 20);
+		--surface: rgba(0, 0, 0, 0.9);
+		--foreground: white;
+		--control-background: rgb(41, 41, 41);
+		--control-border: white;
+		--control-active: rgb(33, 33, 33);
+		--button-active: rgb(60, 60, 60);
+	}
+}
+
+:root[data-theme="light"] {
+	color-scheme: light;
+	--background: rgb(240, 240, 240);
+	--surface: rgba(255, 255, 255, 0.9);
+	--foreground: black;
+	--control-background: white;
+	--control-border: lightgray;
+	--control-active: rgb(232, 232, 232);
+	--button-active: rgb(200, 200, 200);
+}
+
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--background: rgb(20, 20, 20);
+	--surface: rgba(0, 0, 0, 0.9);
+	--foreground: white;
+	--control-background: rgb(41, 41, 41);
+	--control-border: white;
+	--control-active: rgb(33, 33, 33);
+	--button-active: rgb(60, 60, 60);
+}
+
+/* Keep the controls synchronized with the selected theme, including explicit overrides. */
+body {
+	background: var(--background);
+	color: var(--foreground);
+}
+
+#toolbar {
+	background: var(--surface);
+	color: var(--foreground);
+}
+
+select {
+	color: var(--foreground);
+	background: var(--control-background);
+	border-color: var(--control-border);
+}
+
+select:active,
+button:active {
+	background: var(--control-active);
+}
+
+button {
+	background: var(--control-background);
+	color: var(--foreground);
+	border: 1px solid var(--control-border);
+}
+
+.button-active {
+	background: var(--button-active);
+}
+
+/* System mode is represented by the variables above when no data-theme is set. */
 @media (prefers-color-scheme: light) {
 
-	body {
-		background: white;
-	}
-
-	#toolbar {
-		background: rgba(255, 255, 255, 0.9);
-		color: black;
-	}
-
-	select {
-		color: black;
-		background: white;
-		border: 1px solid lightgray;
-	}
-
-	select:active {
-		background: rgb(232, 232, 232);
-	}
-
-	button {
-		background: white;
-		color: black;
-		border: 1px solid lightgray;
-	}
-
-	button:active {
-		background: rgb(232, 232, 232);
-	}
-
-	.button-active {
-		background: rgb(200, 200, 200);
-	}
+	/* Variables provide the light system defaults. */
 }
 
 
 @media (prefers-color-scheme: dark) {
 
-	body {
-		background: black;
-	}
-
-	#toolbar {
-		color: white;
-	}
-
-	select {
-		color: white;
-		background: rgb(41, 41, 41);
-		border: 1px solid white;
-	}
-
-	select:active {
-		background: rgb(33, 33, 33);
-	}
-
-	button {
-		background: rgb(41, 41, 41);
-		color: white;
-		border: 1px solid white;
-	}
-
-	button:active {
-		background: rgb(33, 33, 33);
-	}
-
-	.button-active {
-		background: rgb(60, 60, 60);
-	}
+	/* Variables provide the dark system defaults. */
 }
 
 body {
 	margin: 0px;
 	overflow: hidden;
 	user-select: none;
+	background: var(--background);
 }
 
 #app {
@@ -105,6 +123,10 @@ button {
 	width: 128px;
 	height: 32px;
 	border-radius: 16px;
+}
+
+#theme-toggle {
+	margin-left: auto;
 }
 
 #canv_info {

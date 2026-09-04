@@ -12,6 +12,15 @@ const toolSelect = document.getElementById("tool-select");
 const toolDraw = document.getElementById("tool-draw");
 const toolMove = document.getElementById("tool-move");
 const snapToGridCheckbox = document.getElementById("snap-to-grid");
+const themeToggle = document.getElementById("theme-toggle");
+
+const themeNames = ["system", "light", "dark"];
+const themeColors = {
+	light: { background: [0.94, 0.94, 0.94, 1.0], grid: [0.0, 0.0, 0.0], foreground: [0.0, 0.0, 0.0], infoFill: "black", infoStroke: "white" },
+	dark: { background: [0.08, 0.08, 0.08, 1.0], grid: [1.0, 1.0, 1.0], foreground: [1.0, 1.0, 1.0], infoFill: "white", infoStroke: "black" }
+};
+let selectedTheme = "system";
+let activeTheme = "light";
 
 var showInfo = true;
 const infoText = "click to add vertex";
@@ -75,6 +84,34 @@ var isDraggingMove = false;
 var snappingEnabled = false;
 var zoomFromCursor = false;
 var panSnapEnabled = false;
+
+function getActiveTheme() {
+	if (selectedTheme !== "system") return selectedTheme;
+	return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme() {
+	activeTheme = getActiveTheme();
+	if (selectedTheme === "system") {
+		document.documentElement.removeAttribute("data-theme");
+	} else {
+		document.documentElement.dataset.theme = selectedTheme;
+	}
+	const label = `Theme: ${selectedTheme[0].toUpperCase()}${selectedTheme.slice(1)}`;
+	themeToggle.textContent = label;
+	themeToggle.setAttribute("aria-label", `Color theme: ${label.slice(7)}`);
+}
+
+themeToggle.addEventListener("click", () => {
+	selectedTheme = themeNames[(themeNames.indexOf(selectedTheme) + 1) % themeNames.length];
+	applyTheme();
+});
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+	if (selectedTheme === "system") applyTheme();
+});
+
+applyTheme();
 
 function deleteSelected() {
 	if (selectedVertices.length === 0) return;
@@ -502,12 +539,12 @@ function formatNumber(value) {
 	return Number(value.toFixed(3));
 }
 
-function drawOutlinedText(text, x, y, fillStyle = "white", strokeStyle = "black", font = "14px Arial", textAlign="left", textBaseline="top") {
+function drawOutlinedText(text, x, y, fillStyle = null, strokeStyle = null, font = "14px Arial", textAlign="left", textBaseline="top") {
 	ctx.font = font;
 	ctx.textAlign = textAlign;
 	ctx.textBaseline = textBaseline;
-	ctx.fillStyle = fillStyle;
-	ctx.strokeStyle = strokeStyle;
+	ctx.fillStyle = fillStyle ?? themeColors[activeTheme].infoFill;
+	ctx.strokeStyle = strokeStyle ?? themeColors[activeTheme].infoStroke;
 	ctx.lineWidth = 3;
 	ctx.strokeText(text, x, y);
 	ctx.fillText(text, x, y);
@@ -516,12 +553,13 @@ function drawOutlinedText(text, x, y, fillStyle = "white", strokeStyle = "black"
 function drawInfo() {
 	ctx.resetTransform();
 	ctx.clearRect(0, 0, canvas_info.width, canvas_info.height);
+	const colors = themeColors[activeTheme];
 
 	if (showInfo) {
 		const x = canvas_info.width / 2;
 		const y = canvas_info.height / 2;
 
-		drawOutlinedText(infoText, x, y, "white", "black", "64px Arial", "center", "middle");
+		drawOutlinedText(infoText, x, y, colors.infoFill, colors.infoStroke, "64px Arial", "center", "middle");
 	}
 
 	const worldX = (2 * mousePos.x / canvas.width - 1) / scale.x - offset.x;
@@ -625,7 +663,8 @@ function draw() {
 
 	drawInfo();
 
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	const colors = themeColors[activeTheme];
+	gl.clearColor(...colors.background);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	gl.useProgram(shaderProgram);
@@ -647,7 +686,7 @@ function draw() {
 	}
 
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(gridVertices), gl.DYNAMIC_DRAW);
-	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.2); // very subtle white
+	gl.uniform4f(colorUniformLocation, ...colors.grid, 0.2);
 	gl.drawArrays(gl.LINES, 0, gridVertices.length / 2);
 
 	// draw finer grid (one level smaller)
@@ -663,13 +702,13 @@ function draw() {
 	}
 
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fineGridVertices), gl.DYNAMIC_DRAW);
-	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.1); // more transparent
+	gl.uniform4f(colorUniformLocation, ...colors.grid, 0.1);
 	gl.drawArrays(gl.LINES, 0, fineGridVertices.length / 2);
 
 	// draw origin
 	let originVertices = [-0.1, 0, 0.1, 0, 0, -0.1, 0, 0.1];
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(originVertices), gl.DYNAMIC_DRAW);
-	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.3); // subtle white
+	gl.uniform4f(colorUniformLocation, ...colors.grid, 0.3);
 	gl.drawArrays(gl.LINES, 0, 4);
 
 	// set ARRAY_BUFFER to vertices
@@ -680,7 +719,7 @@ function draw() {
 	gl.uniform2f(offsetUniformLocation, offset.x, offset.y);
 	gl.uniform2f(scaleUniformLocation, scale.x, scale.y);
 
-	gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 1.0);
+	gl.uniform4f(colorUniformLocation, ...colors.foreground, 1.0);
 	gl.drawArrays(mode, 0, vertices.length / 2);
 
 	gl.uniform4f(colorUniformLocation, 0.0, 1.0, 0.0, 1.0);
@@ -723,7 +762,7 @@ function draw() {
 			minX, maxY, minX, minY  // left
 		];
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxVertices), gl.DYNAMIC_DRAW);
-		gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.5); // white with alpha
+		gl.uniform4f(colorUniformLocation, ...colors.foreground, 0.5);
 		gl.drawArrays(gl.LINES, 0, 8);
 	}
 
@@ -772,7 +811,7 @@ function draw() {
 		}
 		let dotVertices = [dotX, dotY];
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dotVertices), gl.DYNAMIC_DRAW);
-		gl.uniform4f(colorUniformLocation, 1.0, 1.0, 1.0, 0.5); // white with alpha
+		gl.uniform4f(colorUniformLocation, ...colors.foreground, 0.5);
 		gl.drawArrays(gl.POINTS, 0, 1);
 	}
 
