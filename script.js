@@ -13,8 +13,23 @@ const toolDraw = document.getElementById("tool-draw");
 const toolMove = document.getElementById("tool-move");
 const snapToGridCheckbox = document.getElementById("snap-to-grid");
 const themeToggle = document.getElementById("theme-toggle");
+const vertexSidebar = document.getElementById("vertex-sidebar");
+const sidebarHandle = document.getElementById("sidebar-handle");
+const sidebarPin = document.getElementById("sidebar-pin");
+const sidebarResize = document.getElementById("sidebar-resize");
+const vertexList = document.getElementById("vertex-list");
+const vertexCount = document.getElementById("vertex-count");
+const groupList = vertexList;
+const groupSelectedButton = document.getElementById("group-selected");
+const ungroupSelectedButton = document.getElementById("ungroup-selected");
 
 const themeNames = ["system", "light", "dark"];
+const themeStorageKey = "gl-primitives-theme";
+const stateStorageKey = "gl-primitives-state";
+const pendingStateStorageKey = "gl-primitives-pending";
+const saveDialog = document.getElementById("save-dialog");
+const saveChangesButton = document.getElementById("save-changes");
+const discardChangesButton = document.getElementById("discard-changes");
 const themeColors = {
 	light: { background: [0.94, 0.94, 0.94, 1.0], grid: [0.0, 0.0, 0.0], foreground: [0.0, 0.0, 0.0], infoFill: "black", infoStroke: "white" },
 	dark: { background: [0.08, 0.08, 0.08, 1.0], grid: [1.0, 1.0, 1.0], foreground: [1.0, 1.0, 1.0], infoFill: "white", infoStroke: "black" }
@@ -71,7 +86,12 @@ const minScale = 0.05;
 const maxScale = 20.0;
 
 var vertices = [];
+var vertexNames = [];
 var selectedVertices = [];
+var selectionAnchorIndex = null;
+var vertexGroups = [];
+var nextGroupId = 1;
+var collapsedGroupIds = new Set();
 
 var squareVerticesBuffer = null;
 
@@ -84,6 +104,406 @@ var isDraggingMove = false;
 var snappingEnabled = false;
 var zoomFromCursor = false;
 var panSnapEnabled = false;
+var sidebarOpen = false;
+var sidebarPinned = false;
+var sidebarWidth = 280;
+var isResizingSidebar = false;
+var renderedVertexState = "";
+var renamingVertexIndex = null;
+var renamingVertexIndices = [];
+var renamingGroupId = null;
+var isRenderingVertexList = false;
+var savedStateJson = "";
+
+function getAppState() {
+	return {
+		version: 2,
+		theme: selectedTheme,
+		primitiveType: mode,
+		tool: currentTool,
+		vertices,
+		vertexNames,
+		vertexGroups,
+		collapsedGroups: [...collapsedGroupIds],
+		selectedVertices,
+		offset,
+		scale,
+		snappingEnabled,
+		zoomFromCursor,
+		panSnapEnabled,
+		showInfo
+	};
+}
+
+function getAppStateJson() {
+	return JSON.stringify(getAppState());
+}
+
+function saveAppState(stateJson = getAppStateJson()) {
+	localStorage.setItem(stateStorageKey, stateJson);
+	localStorage.removeItem(pendingStateStorageKey);
+	savedStateJson = stateJson;
+}
+
+function restoreAppState(stateJson) {
+	try {
+		const state = JSON.parse(stateJson);
+		if (!state || ![1, 2].includes(state.version)) return false;
+		if (themeNames.includes(state.theme)) selectedTheme = state.theme;
+		mode = Number.isInteger(state.primitiveType) ? Math.max(0, Math.min(6, state.primitiveType)) : mode;
+		if (["pan", "select", "draw", "move"].includes(state.tool)) currentTool = state.tool;
+		if (Array.isArray(state.vertices) && state.vertices.every(value => typeof value === "number")) vertices = state.vertices;
+		if (Array.isArray(state.vertexNames)) vertexNames = state.vertexNames.map(name => String(name));
+		while (vertexNames.length < vertices.length / 2) vertexNames.push("");
+		vertexNames.length = vertices.length / 2;
+		if (Array.isArray(state.selectedVertices)) selectedVertices = state.selectedVertices.filter(index => Number.isInteger(index) && index >= 0 && index < vertices.length / 2);
+		if (state.version >= 2 && Array.isArray(state.vertexGroups)) {
+			vertexGroups = state.vertexGroups.map((group, index) => ({
+				id: Number.isInteger(group.id) ? group.id : index + 1,
+				name: String(group.name || `Group ${index + 1}`),
+				primitiveType: Number.isInteger(group.primitiveType) ? Math.max(0, Math.min(6, group.primitiveType)) : mode,
+				indices: Array.isArray(group.indices) ? group.indices.filter(vertexIndex => Number.isInteger(vertexIndex) && vertexIndex >= 0 && vertexIndex < vertices.length / 2) : []
+			})).filter(group => group.indices.length > 0);
+			nextGroupId = Math.max(0, ...vertexGroups.map(group => group.id)) + 1;
+			collapsedGroupIds = new Set(Array.isArray(state.collapsedGroups) ? state.collapsedGroups : []);
+		}
+		if (state.offset && Number.isFinite(state.offset.x) && Number.isFinite(state.offset.y)) offset = { x: state.offset.x, y: state.offset.y };
+		if (state.scale && Number.isFinite(state.scale.x)) scale.x = Math.max(minScale, Math.min(maxScale, state.scale.x));
+		snappingEnabled = Boolean(state.snappingEnabled);
+		zoomFromCursor = Boolean(state.zoomFromCursor);
+		panSnapEnabled = Boolean(state.panSnapEnabled);
+		showInfo = state.showInfo !== false;
+		selectionAnchorIndex = selectedVertices.at(-1) ?? null;
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function openSaveDialog(pendingJson) {
+	saveDialog.hidden = false;
+	saveChangesButton.onclick = () => {
+		restoreAppState(pendingJson);
+		applyTheme();
+		glPrimitiveType.selectedIndex = mode;
+		updateActiveButton();
+		renderedVertexState = "";
+		renderVertexList();
+		saveAppState(pendingJson);
+		saveDialog.hidden = true;
+	};
+	discardChangesButton.onclick = () => {
+		localStorage.removeItem(pendingStateStorageKey);
+		saveDialog.hidden = true;
+	};
+}
+
+function updateSidebarLayout() {
+	const content = document.getElementById("content");
+	content.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+	content.classList.toggle("is-pinned", sidebarPinned);
+	vertexSidebar.classList.toggle("is-pinned", sidebarPinned);
+	sidebarHandle.classList.toggle("is-pinned", sidebarPinned);
+	if (sidebarPinned) {
+		vertexSidebar.classList.add("is-open");
+		sidebarHandle.classList.remove("is-open");
+	} else {
+		vertexSidebar.classList.toggle("is-open", sidebarOpen);
+		sidebarHandle.classList.toggle("is-open", sidebarOpen);
+	}
+	sidebarHandle.textContent = sidebarOpen ? "<" : ">";
+	sidebarPin.textContent = sidebarPinned ? "unpin" : "pin";
+	sidebarPin.setAttribute("aria-label", `${sidebarPinned ? "Unpin" : "Pin"} sidebar`);
+	sidebarPin.setAttribute("title", `${sidebarPinned ? "Unpin" : "Pin"} sidebar`);
+	sidebarPin.setAttribute("aria-pressed", sidebarPinned);
+	adjustCanvasSize();
+}
+
+function formatVertex(value) {
+	return Number(value.toFixed(3));
+}
+
+function centerViewOnVertices(indices) {
+	if (indices.length === 0) return;
+	let minX = Infinity;
+	let maxX = -Infinity;
+	let minY = Infinity;
+	let maxY = -Infinity;
+	for (const index of indices) {
+		const x = vertices[index * 2];
+		const y = vertices[index * 2 + 1];
+		minX = Math.min(minX, x);
+		maxX = Math.max(maxX, x);
+		minY = Math.min(minY, y);
+		maxY = Math.max(maxY, y);
+	}
+	offset.x = -(minX + maxX) / 2;
+	offset.y = -(minY + maxY) / 2;
+}
+
+function scrollVertexListToIndex(index) {
+	requestAnimationFrame(() => requestAnimationFrame(() => {
+		const row = vertexList.querySelector(`[data-index="${index}"]`);
+		if (!row) return;
+		const maxScrollTop = Math.max(0, vertexList.scrollHeight - vertexList.clientHeight);
+		vertexList.scrollTop = index === 0 ? 0 : Math.min(row.offsetTop, maxScrollTop);
+	}));
+}
+
+function primitiveOptions(selectedType) {
+	return Array.from({ length: 7 }, (_, index) => `<option value="${index}"${index === selectedType ? " selected" : ""}>${glPrimitiveType.options[index].textContent}</option>`).join("");
+}
+
+function renderGroupList() {
+	groupList.replaceChildren();
+	for (const group of vertexGroups) {
+		const item = document.createElement("div");
+		item.className = "group-item";
+		item.dataset.groupId = group.id;
+		item.tabIndex = 0;
+		item.setAttribute("role", "listitem");
+		item.classList.toggle("is-selected", group.indices.every(index => selectedVertices.includes(index)));
+		const name = document.createElement("span");
+		name.className = "group-name";
+		name.textContent = `${group.name} (${group.indices.length})`;
+		const toggle = document.createElement("button");
+		toggle.className = "group-toggle";
+		toggle.type = "button";
+		toggle.textContent = collapsedGroupIds.has(group.id) ? ">" : "v";
+		toggle.setAttribute("aria-label", `${collapsedGroupIds.has(group.id) ? "Expand" : "Collapse"} ${group.name}`);
+		toggle.addEventListener("click", event => {
+			event.stopPropagation();
+			if (collapsedGroupIds.has(group.id)) collapsedGroupIds.delete(group.id);
+			else collapsedGroupIds.add(group.id);
+			renderedVertexState = "";
+			renderVertexList();
+		});
+		item.appendChild(toggle);
+		item.appendChild(name);
+		if (renamingGroupId === group.id) {
+			const input = document.createElement("input");
+			input.className = "vertex-name-input";
+			input.value = group.name;
+			name.replaceWith(input);
+			input.addEventListener("keydown", event => {
+				event.stopPropagation();
+				if (event.key === "Enter") { event.preventDefault(); commitGroupRename(input.value); }
+				if (event.key === "Escape") { event.preventDefault(); cancelGroupRename(); }
+			});
+			input.addEventListener("blur", () => commitGroupRename(input.value), { once: true });
+			requestAnimationFrame(() => { input.focus(); input.select(); });
+		} else {
+			const type = document.createElement("select");
+			type.className = "group-type";
+			type.innerHTML = primitiveOptions(group.primitiveType);
+			type.addEventListener("click", event => event.stopPropagation());
+			type.addEventListener("change", event => { group.primitiveType = Number(event.target.value); renderedVertexState = ""; });
+			item.appendChild(type);
+		}
+		item.addEventListener("click", event => {
+			if (event.target.matches("input, select")) return;
+			selectedVertices = [...group.indices];
+			selectionAnchorIndex = selectedVertices.at(-1) ?? null;
+			renderedVertexState = "";
+			renderVertexList();
+			requestAnimationFrame(() => groupList.querySelector(`[data-group-id="${group.id}"]`)?.focus());
+		});
+		item.addEventListener("dblclick", event => {
+			if (!event.target.closest(".group-name")) return;
+			event.preventDefault();
+			selectedVertices = [...group.indices];
+			selectionAnchorIndex = selectedVertices.at(-1) ?? null;
+			centerViewOnVertices(group.indices);
+			renderedVertexState = "";
+			renderVertexList();
+			const firstGroupIndex = Math.min(...group.indices);
+			scrollVertexListToIndex(firstGroupIndex);
+			requestAnimationFrame(() => groupList.querySelector(`[data-group-id="${group.id}"]`)?.focus());
+		});
+		item.addEventListener("keydown", event => {
+			if (event.key === "F2") {
+				event.preventDefault();
+				event.stopPropagation();
+				renamingGroupId = group.id;
+				renderedVertexState = "";
+				renderVertexList();
+			}
+		});
+		groupList.appendChild(item);
+	}
+}
+
+function renderVertexList() {
+	const state = `${vertices.join(",")}|${vertexNames.join("|")}|${JSON.stringify(vertexGroups)}|${selectedVertices.join(",")}|${renamingVertexIndex}|${renamingVertexIndices.join(",")}|${renamingGroupId}`;
+	if (state === renderedVertexState) return;
+	renderedVertexState = state;
+	const scrollTop = vertexList.scrollTop;
+	vertexCount.textContent = vertices.length / 2;
+	isRenderingVertexList = true;
+	vertexList.replaceChildren();
+	renderGroupList();
+
+	for (let index = 0; index < vertices.length / 2; index++) {
+		const item = document.createElement("div");
+		item.className = "vertex-item";
+		item.dataset.index = index;
+		item.setAttribute("role", "listitem");
+		item.tabIndex = 0;
+		item.classList.toggle("is-selected", selectedVertices.includes(index));
+		const name = vertexNames[index] || `Vertex ${index}`;
+		item.innerHTML = `<span class="vertex-index">#${index}</span><span class="vertex-name"></span><span class="vertex-position">${formatVertex(vertices[index * 2])}, ${formatVertex(vertices[index * 2 + 1])}</span>`;
+		item.querySelector(".vertex-name").textContent = name;
+		if (renamingVertexIndex === index) {
+			const nameElement = item.querySelector(".vertex-name");
+			const input = document.createElement("input");
+			input.className = "vertex-name-input";
+			input.value = vertexNames[index] || "";
+			input.placeholder = `Vertex ${index}`;
+			nameElement.replaceWith(input);
+			input.addEventListener("keydown", event => {
+				event.stopPropagation();
+				if (event.key === "Enter") {
+					event.preventDefault();
+					commitVertexRename(input.value);
+				} else if (event.key === "Escape") {
+					event.preventDefault();
+					cancelVertexRename();
+				}
+			});
+			input.addEventListener("blur", () => {
+				if (isRenderingVertexList) {
+					setTimeout(() => commitVertexRename(input.value), 0);
+				} else {
+					commitVertexRename(input.value);
+				}
+			}, { once: true });
+			requestAnimationFrame(() => {
+				input.focus();
+				input.select();
+			});
+		}
+		item.addEventListener("click", event => {
+			if (event.target.matches("input")) return;
+			item.focus();
+			if (event.shiftKey && selectionAnchorIndex !== null) {
+				const rangeStart = Math.min(selectionAnchorIndex, index);
+				const rangeEnd = Math.max(selectionAnchorIndex, index);
+				const range = Array.from({ length: rangeEnd - rangeStart + 1 }, (_, offset) => rangeStart + offset);
+				selectedVertices = event.ctrlKey || event.metaKey
+					? [...new Set([...selectedVertices, ...range])]
+					: range;
+			} else if (event.ctrlKey || event.metaKey) {
+				if (selectedVertices.includes(index)) {
+					selectedVertices = selectedVertices.filter(selectedIndex => selectedIndex !== index);
+				} else {
+					selectedVertices = [...selectedVertices, index];
+				}
+				selectionAnchorIndex = index;
+			} else {
+				selectedVertices = [index];
+				selectionAnchorIndex = index;
+			}
+			renderedVertexState = "";
+			renderVertexList();
+			vertexList.querySelector(`[data-index="${index}"]`)?.focus();
+		});
+		item.addEventListener("dblclick", event => {
+			if (event.target.closest("input")) return;
+			event.preventDefault();
+			selectedVertices = [index];
+			selectionAnchorIndex = index;
+			centerViewOnVertices([index]);
+			renderedVertexState = "";
+			renderVertexList();
+			vertexList.querySelector(`[data-index="${index}"]`)?.focus();
+		});
+		item.addEventListener("keydown", event => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				item.click();
+			}
+		});
+		vertexList.appendChild(item);
+	}
+	for (const group of vertexGroups) {
+		const groupItem = vertexList.querySelector(`[data-group-id="${group.id}"]`);
+		if (!groupItem) continue;
+		let nextItem = groupItem.nextSibling;
+		for (const index of [...group.indices].sort((a, b) => a - b)) {
+			const vertexItem = vertexList.querySelector(`[data-index="${index}"]`);
+			if (!vertexItem) continue;
+			vertexItem.hidden = collapsedGroupIds.has(group.id);
+			vertexList.insertBefore(vertexItem, nextItem);
+			nextItem = vertexItem.nextSibling;
+		}
+	}
+	isRenderingVertexList = false;
+	vertexList.scrollTop = scrollTop;
+}
+
+vertexSidebar.addEventListener("click", event => {
+	if (event.target.closest("button, input, select, .vertex-item, .group-item, #sidebar-resize")) return;
+	selectedVertices = [];
+	selectionAnchorIndex = null;
+	renderedVertexState = "";
+	renderVertexList();
+});
+
+function commitVertexRename(name) {
+	if (renamingVertexIndex === null) return;
+	const baseName = name.trim() || "Vertex";
+	const focusIndex = renamingVertexIndices[0];
+	renamingVertexIndices.forEach((index, order) => {
+		vertexNames[index] = `${baseName} ${order + 1}`;
+	});
+	renamingVertexIndex = null;
+	renamingVertexIndices = [];
+	renderedVertexState = "";
+	renderVertexList();
+	vertexList.querySelector(`[data-index="${focusIndex}"]`)?.focus();
+}
+
+function cancelVertexRename() {
+	renamingVertexIndex = null;
+	renamingVertexIndices = [];
+	renderedVertexState = "";
+	renderVertexList();
+}
+
+sidebarHandle.addEventListener("click", () => {
+	sidebarOpen = !sidebarOpen;
+	updateSidebarLayout();
+	sidebarHandle.setAttribute("aria-expanded", sidebarOpen);
+	sidebarHandle.setAttribute("aria-label", `${sidebarOpen ? "Hide" : "Show"} vertex sidebar`);
+});
+
+sidebarPin.addEventListener("click", () => {
+	sidebarPinned = !sidebarPinned;
+	sidebarOpen = true;
+	updateSidebarLayout();
+	sidebarHandle.setAttribute("aria-expanded", true);
+});
+
+sidebarResize.addEventListener("mousedown", event => {
+	event.preventDefault();
+	isResizingSidebar = true;
+	document.getElementById("content").classList.add("is-resizing");
+	document.body.style.cursor = "ew-resize";
+});
+
+window.addEventListener("mousemove", event => {
+	if (!isResizingSidebar) return;
+	const sidebarLeft = vertexSidebar.getBoundingClientRect().left;
+	sidebarWidth = Math.max(220, Math.min(420, event.clientX - sidebarLeft));
+	updateSidebarLayout();
+});
+
+window.addEventListener("mouseup", () => {
+	if (!isResizingSidebar) return;
+	isResizingSidebar = false;
+	document.getElementById("content").classList.remove("is-resizing");
+	document.body.style.cursor = "";
+});
 
 function getActiveTheme() {
 	if (selectedTheme !== "system") return selectedTheme;
@@ -107,20 +527,71 @@ themeToggle.addEventListener("click", () => {
 	applyTheme();
 });
 
+window.addEventListener("storage", event => {
+	if (event.key !== themeStorageKey || !themeNames.includes(event.newValue)) return;
+	selectedTheme = event.newValue;
+	applyTheme();
+});
+
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
 	if (selectedTheme === "system") applyTheme();
 });
 
+const storedState = localStorage.getItem(stateStorageKey);
+if (storedState) restoreAppState(storedState);
+else {
+	const storedTheme = localStorage.getItem(themeStorageKey);
+	if (themeNames.includes(storedTheme)) selectedTheme = storedTheme;
+}
+localStorage.removeItem(themeStorageKey);
 applyTheme();
+
+const pendingState = localStorage.getItem(pendingStateStorageKey);
+if (pendingState) openSaveDialog(pendingState);
+
+window.addEventListener("beforeunload", event => {
+	const currentStateJson = getAppStateJson();
+	if (currentStateJson === savedStateJson) return;
+	localStorage.setItem(pendingStateStorageKey, currentStateJson);
+	event.preventDefault();
+	event.returnValue = "Unsaved changes";
+});
+
+saveChangesButton.addEventListener("click", () => saveAppState());
+
+discardChangesButton.addEventListener("click", () => {
+	localStorage.removeItem(pendingStateStorageKey);
+	const stored = localStorage.getItem(stateStorageKey);
+	if (stored) restoreAppState(stored);
+	applyTheme();
+	renderedVertexState = "";
+	renderVertexList();
+	glPrimitiveType.selectedIndex = mode;
+	updateActiveButton();
+	saveDialog.hidden = true;
+});
+
+savedStateJson = getAppStateJson();
 
 function deleteSelected() {
 	if (selectedVertices.length === 0) return;
-	// sort descending to remove from end
-	selectedVertices.sort((a, b) => b - a);
-	for (let idx of selectedVertices) {
-		vertices.splice(idx * 2, 2);
+	const deleted = new Set(selectedVertices);
+	const indexMap = new Map();
+	let nextIndex = 0;
+	const nextVertices = [];
+	const nextNames = [];
+	for (let index = 0; index < vertices.length / 2; index++) {
+		if (deleted.has(index)) continue;
+		indexMap.set(index, nextIndex++);
+		nextVertices.push(vertices[index * 2], vertices[index * 2 + 1]);
+		nextNames.push(vertexNames[index] || "");
 	}
+	vertices = nextVertices;
+	vertexNames = nextNames;
+	vertexGroups = vertexGroups.map(group => ({ ...group, indices: group.indices.filter(index => !deleted.has(index)).map(index => indexMap.get(index)) })).filter(group => group.indices.length > 0);
 	selectedVertices = [];
+	selectionAnchorIndex = null;
+	renderedVertexState = "";
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 }
 
@@ -180,7 +651,11 @@ snapToGridCheckbox.addEventListener("change", e => {
 
 clearVertices.addEventListener("click", e => {
 	vertices = [];
+	vertexNames = [];
+	vertexGroups = [];
 	selectedVertices = [];
+	selectionAnchorIndex = null;
+	renderedVertexState = "";
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 });
 
@@ -189,15 +664,56 @@ window.addEventListener("resize", e => {
 });
 
 window.addEventListener("keydown", e => {
+	const targetElement = e.target instanceof Element ? e.target : null;
+	const targetIsTextInput = targetElement?.matches("input, textarea, [contenteditable=\"true\"]");
+	if (targetIsTextInput) return;
+	const vertexItemHasFocus = targetElement?.closest(".vertex-item") !== null;
+	const canvasHasFocus = document.activeElement === canvas;
+	const sidebarHasFocus = vertexSidebar.contains(document.activeElement);
+	if (e.key === "F2" && (vertexItemHasFocus || sidebarHasFocus || canvasHasFocus) && selectedVertices.length > 0) {
+		e.preventDefault();
+		sidebarOpen = true;
+		const index = selectedVertices[0];
+		renamingVertexIndex = index;
+		renamingVertexIndices = [...selectedVertices].sort((a, b) => a - b);
+		renderedVertexState = "";
+		updateSidebarLayout();
+		return;
+	}
+	if ((canvasHasFocus || sidebarHasFocus) && e.key === 'a' && e.ctrlKey) {
+		e.preventDefault();
+		const allVertices = Array.from({ length: vertices.length / 2 }, (_, i) => i);
+		const allSelected = allVertices.length > 0 && selectedVertices.length === allVertices.length;
+		selectedVertices = allSelected ? [] : allVertices;
+		selectionAnchorIndex = selectedVertices.length > 0 ? selectedVertices[selectedVertices.length - 1] : null;
+		renderedVertexState = "";
+		renderVertexList();
+		if (sidebarHasFocus && selectedVertices.length > 0) {
+			vertexList.querySelector(`[data-index="${selectedVertices[0]}"]`)?.focus();
+		}
+		return;
+	}
+	if ((canvasHasFocus || sidebarHasFocus) && e.key === "Delete") {
+		e.preventDefault();
+		deleteSelected();
+		return;
+	}
+	if (!canvasHasFocus) return;
 	keys[e.key] = true;
+
+	if (e.key === "F2" && selectedVertices.length > 0) {
+		e.preventDefault();
+		sidebarOpen = true;
+		const index = selectedVertices[0];
+		renamingVertexIndex = index;
+		renamingVertexIndices = [...selectedVertices].sort((a, b) => a - b);
+		renderedVertexState = "";
+		updateSidebarLayout();
+		return;
+	}
 
 	if (e.key == "u") mode = Math.min(mode + 1, 6);
 	if (e.key == "j") mode = Math.max(mode - 1, 0);
-
-	if (e.key === 'a' && e.ctrlKey) {
-		e.preventDefault();
-		selectedVertices = vertices.length > 0 ? Array.from({ length: vertices.length / 2 }, (_, i) => i) : [];
-	}
 
 	if (e.key === 'd') {
 		currentTool = 'draw';
@@ -254,15 +770,14 @@ window.addEventListener("keydown", e => {
 		scale.x = 1.0;
 	}
 
-	if (e.key === "Delete") {
-		deleteSelected();
-	}
 	if (currentTool === 'move' && e.key.startsWith('Arrow')) {
 		e.preventDefault();
 	}
 });
 
 window.addEventListener("keyup", e => {
+	const targetElement = e.target instanceof Element ? e.target : null;
+	if (targetElement?.matches("input, textarea, [contenteditable=\"true\"]") || document.activeElement !== canvas) return;
 	keys[e.key] = false;
 	if (e.key === " ") {
 		spacePressed = false;
@@ -283,6 +798,17 @@ window.addEventListener("keyup", e => {
 });
 
 canvas.addEventListener("mousedown", e => {
+	const canvasHadFocus = document.activeElement === canvas;
+	canvas.focus();
+	if (!canvasHadFocus && currentTool === "draw") {
+		mousePos.x = e.offsetX;
+		mousePos.y = e.offsetY;
+		return;
+	}
+	if (showInfo) {
+		showInfo = false;
+		savedStateJson = "";
+	}
 	lastMousePos.x = e.offsetX;
 	lastMousePos.y = e.offsetY;
 	if (e.button === 0) {  // left mouse button only
@@ -302,6 +828,8 @@ canvas.addEventListener("mousedown", e => {
 				[worldX, worldY] = snapToGrid(worldX, worldY);
 			}
 			vertices.push(worldX, worldY);
+			vertexNames.push("");
+			renderedVertexState = "";
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 		} else if (currentTool === 'move') {
 			if (selectedVertices.length > 0) {
@@ -393,6 +921,7 @@ function finalizeDragOperation() {
 			} else {
 				selectedVertices = newSelected;
 			}
+			renderedVertexState = "";
 		} else {
 			// click select nearest vertex
 			const worldX = (2 * rectSelectStart.x / canvas.width - 1) / scale.x - offset.x;
@@ -419,6 +948,7 @@ function finalizeDragOperation() {
 			} else {
 				selectedVertices = [];
 			}
+			renderedVertexState = "";
 		}
 		rectSelectStart = null;
 	}
@@ -473,13 +1003,16 @@ Promise.all([
 		await makeShaders(shaders);
 		initBuffers();
 
-		setActiveTool(toolDraw);
+		glPrimitiveType.selectedIndex = mode;
+		updateActiveButton();
 
 		draw();
 	});
 
 function adjustCanvasSize() {
-	canvas.width = canvas_info.width = window.innerWidth;
+	const content = document.getElementById("content");
+	const canvasWidth = sidebarPinned ? content.clientWidth - sidebarWidth : window.innerWidth;
+	canvas.width = canvas_info.width = Math.max(1, canvasWidth);
 	canvas.height = canvas_info.height = window.innerHeight;
 	gl.viewport(0, 0, canvas.width, canvas.height);
 }
@@ -661,6 +1194,7 @@ function draw() {
 	}
 	canvas.style.cursor = cursor;
 
+	renderVertexList();
 	drawInfo();
 
 	const colors = themeColors[activeTheme];
@@ -719,8 +1253,22 @@ function draw() {
 	gl.uniform2f(offsetUniformLocation, offset.x, offset.y);
 	gl.uniform2f(scaleUniformLocation, scale.x, scale.y);
 
-	gl.uniform4f(colorUniformLocation, ...colors.foreground, 1.0);
-	gl.drawArrays(mode, 0, vertices.length / 2);
+	const groupedIndices = new Set(vertexGroups.flatMap(group => group.indices));
+	const ungroupedIndices = Array.from({ length: vertices.length / 2 }, (_, index) => index).filter(index => !groupedIndices.has(index));
+	const drawVertexIndices = (indices, primitiveType) => {
+		if (indices.length === 0) return;
+		const groupedVertices = indices.flatMap(index => [vertices[index * 2], vertices[index * 2 + 1]]);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(groupedVertices), gl.DYNAMIC_DRAW);
+		gl.uniform4f(colorUniformLocation, ...colors.foreground, 1.0);
+		gl.drawArrays(primitiveType, 0, indices.length);
+	};
+
+	drawVertexIndices(ungroupedIndices, mode);
+	for (const group of vertexGroups) {
+		drawVertexIndices(group.indices, group.primitiveType);
+	}
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 
 	gl.uniform4f(colorUniformLocation, 0.0, 1.0, 0.0, 1.0);
 	gl.drawArrays(gl.POINTS, 0, vertices.length / 2);
@@ -817,3 +1365,39 @@ function draw() {
 
 	requestAnimationFrame(draw);
 }
+
+function commitGroupRename(name) {
+	const group = vertexGroups.find(candidate => candidate.id === renamingGroupId);
+	if (!group) return;
+	group.name = name.trim() || "Group";
+	renamingGroupId = null;
+	renderedVertexState = "";
+	renderVertexList();
+}
+
+function cancelGroupRename() {
+	renamingGroupId = null;
+	renderedVertexState = "";
+	renderVertexList();
+}
+
+function groupSelectedVertices() {
+	if (selectedVertices.length === 0) return;
+	const indices = [...new Set(selectedVertices)].sort((a, b) => a - b);
+	vertexGroups.forEach(group => { group.indices = group.indices.filter(index => !indices.includes(index)); });
+	vertexGroups = vertexGroups.filter(group => group.indices.length > 0);
+	vertexGroups.push({ id: nextGroupId++, name: `Group ${nextGroupId - 1}`, primitiveType: mode, indices });
+	renderedVertexState = "";
+	renderVertexList();
+}
+
+function ungroupSelectedVertices() {
+	const selected = new Set(selectedVertices);
+	vertexGroups.forEach(group => { group.indices = group.indices.filter(index => !selected.has(index)); });
+	vertexGroups = vertexGroups.filter(group => group.indices.length > 0);
+	renderedVertexState = "";
+	renderVertexList();
+}
+
+groupSelectedButton.addEventListener("click", groupSelectedVertices);
+ungroupSelectedButton.addEventListener("click", ungroupSelectedVertices);

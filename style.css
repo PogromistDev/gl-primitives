@@ -135,6 +135,299 @@ button {
 	pointer-events: none;
 }
 
+#content.is-pinned #canv_info {
+	left: var(--sidebar-width);
+}
+
+#content {
+	position: relative;
+	height: calc(100vh - 54px);
+	overflow: hidden;
+	--sidebar-width: 280px;
+	transition: padding-left 160ms ease;
+}
+
+#content.is-pinned {
+	padding-left: var(--sidebar-width);
+}
+
+#content.is-resizing,
+#content.is-resizing #sidebar-handle {
+	transition: none;
+}
+
+#vertex-sidebar {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 3;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	width: var(--sidebar-width);
+	height: 100%;
+	padding: 12px 10px 10px;
+	background: var(--surface);
+	border-right: 1px solid var(--control-border);
+	border-radius: 0px 10px 10px 0px;
+	color: var(--foreground);
+	transform: translateX(-100%);
+	transition: transform 160ms ease;
+	backdrop-filter: blur(4px);
+}
+
+#vertex-sidebar.is-open {
+	transform: translateX(0px);
+}
+
+#vertex-sidebar-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0px 4px 8px;
+	border-bottom: 1px solid var(--control-border);
+}
+
+#vertex-sidebar-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+#vertex-count {
+	min-width: 24px;
+	padding: 2px 6px;
+	box-sizing: border-box;
+	border-radius: 10px;
+	background: var(--button-active);
+	font-size: 12px;
+	text-align: center;
+}
+
+#sidebar-pin {
+	width: auto;
+	height: 24px;
+	margin: 0px;
+	padding: 0px 8px;
+	border-radius: 12px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+#clear-vertices {
+	width: auto;
+	height: 24px;
+	margin: 0px;
+	padding: 0px 8px;
+	border-radius: 12px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+#vertex-sidebar.is-pinned #sidebar-pin {
+	background: var(--button-active);
+}
+
+#vertex-list {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0px;
+	gap: 4px;
+	margin-top: 8px;
+	padding: 0px 2px 48px 0px;
+	box-sizing: border-box;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+#group-actions {
+	display: flex;
+	gap: 5px;
+	margin-top: 8px;
+}
+
+#group-actions button {
+	width: auto;
+	height: 26px;
+	margin: 0px;
+	padding: 0px 7px;
+	border-radius: 13px;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+#group-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 8px;
+}
+
+.group-item {
+	display: grid;
+	grid-template-columns: 22px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 6px;
+	box-sizing: border-box;
+	min-height: 32px;
+	padding: 4px 8px;
+	border: 1px solid var(--control-border);
+	border-radius: 6px;
+	background: var(--button-active);
+	color: var(--foreground);
+	cursor: pointer;
+}
+
+.group-toggle {
+	width: 20px;
+	height: 20px;
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--foreground);
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.group-toggle:hover {
+	background: var(--control-active);
+}
+
+.group-item.is-selected {
+	outline: 2px solid var(--foreground);
+	outline-offset: -2px;
+}
+
+.group-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.group-type {
+	width: 74px;
+	height: 24px;
+	border-radius: 12px;
+	font-size: 10px;
+}
+
+.vertex-item {
+	display: grid;
+	grid-template-columns: 34px minmax(0, 1fr) auto;
+	align-items: center;
+	box-sizing: border-box;
+	align-self: stretch;
+	width: auto;
+	max-width: 100%;
+	min-width: 0px;
+	min-height: 34px;
+	padding: 4px 8px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--foreground);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	overflow: hidden;
+}
+
+.vertex-item[hidden] {
+	display: none;
+}
+
+.vertex-item:focus-visible {
+	outline: 2px solid var(--control-border);
+	outline-offset: -2px;
+}
+
+.vertex-item:hover {
+	background: var(--control-active);
+}
+
+.vertex-item.is-selected {
+	border-color: var(--control-border);
+	background: var(--button-active);
+}
+
+.vertex-index {
+	font-size: 12px;
+	opacity: 0.7;
+}
+
+.vertex-name {
+	min-width: 0px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.vertex-name-input {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0px;
+	border: 1px solid var(--control-border);
+	border-radius: 3px;
+	background: var(--control-background);
+	color: var(--foreground);
+	font: inherit;
+	outline: none;
+}
+
+.vertex-position {
+	min-width: 0px;
+	font-family: monospace;
+	font-size: 12px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: right;
+}
+
+#sidebar-handle {
+	position: absolute;
+	top: 50%;
+	left: 0px;
+	z-index: 4;
+	width: 24px;
+	height: 64px;
+	margin: -32px 0px 0px;
+	padding: 0px;
+	border: 1px solid var(--control-border);
+	border-left: none;
+	border-radius: 0px 12px 12px 0px;
+	background: var(--control-background);
+	color: var(--foreground);
+	font-size: 24px;
+	line-height: 1;
+	cursor: pointer;
+	transition: left 160ms ease;
+}
+
+#sidebar-handle.is-open {
+	left: var(--sidebar-width);
+}
+
+#sidebar-handle.is-pinned {
+	display: none;
+}
+
+#sidebar-handle:hover {
+	background: var(--control-active);
+}
+
+#sidebar-resize {
+	position: absolute;
+	top: 0px;
+	right: -4px;
+	width: 8px;
+	height: 100%;
+	cursor: ew-resize;
+}
+
 #tools {
 	display: inline-flex;
 	overflow: hidden;
@@ -159,5 +452,46 @@ button {
 	max-width: 64px;
 	text-align: center;
 
+	cursor: pointer;
+}
+
+#save-dialog[hidden] {
+	display: none;
+}
+
+#save-dialog {
+	position: fixed;
+	inset: 0px;
+	z-index: 10;
+	display: grid;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.45);
+}
+
+#save-dialog-panel {
+	box-sizing: border-box;
+	width: min(360px, calc(100vw - 32px));
+	padding: 18px;
+	border: 1px solid var(--control-border);
+	border-radius: 10px;
+	background: var(--surface);
+	color: var(--foreground);
+	box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+#save-dialog-panel p {
+	margin: 10px 0px 16px;
+}
+
+#save-dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+}
+
+#save-dialog-actions button {
+	width: auto;
+	margin: 0px;
+	padding: 0px 14px;
 	cursor: pointer;
 }
