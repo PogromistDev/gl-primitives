@@ -5,6 +5,7 @@
 	<title>GL Primitives Demo</title>
 	<link rel="shortcut icon" href="favicon.png" type="image/png">
 	<link rel="stylesheet" type="text/css" href="style.css">
+	<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
 	<script src="script.js" defer></script>
 </head>
 
@@ -50,6 +51,62 @@
 			<button id="sidebar-handle" type="button" aria-label="Show vertex sidebar" aria-expanded="false">&#8250;</button>
 			<canvas id="canv" tabindex="0" aria-label="Drawing canvas"></canvas>
 			<canvas id="canv_info"></canvas>
+			<aside id="code-panel" aria-label="Coding panel">
+				<div id="code-panel-header">
+					<strong>Coding</strong>
+					<button id="code-panel-pin" type="button" aria-label="Pin coding panel" aria-pressed="false" title="Pin coding panel">pin</button>
+				</div>
+				<div id="code-controls">
+					<select id="code-mode" aria-label="Code mode">
+						<option value="api">Coding</option>
+						<option value="vertex">Vertex shader</option>
+						<option value="fragment">Fragment shader</option>
+					</select>
+					<select id="code-example" aria-label="Code example">
+						<option value="blank">Custom code</option>
+						<option value="api-documentation">API Documentation</option>
+					</select>
+				</div>
+				<article id="api-documentation" aria-label="Canvas API documentation" hidden>
+					<h2>Canvas API</h2>
+					<p>Use <code>currentDocument</code> in the editor below to create and organize vertices, groups, selections, and the viewport. The browser's <code>document</code> API remains available.</p>
+					<h3>Vertices</h3>
+					<p>Create points individually or in batches. Updates change only the supplied fields; removal accepts one index or a list of indices.</p>
+					<pre><code class="lang-javascript">currentDocument.vertices.list()
+currentDocument.vertices.get(index)
+currentDocument.vertices.create(x, y, name?)
+currentDocument.vertices.createMany([{ x, y, name? }])
+currentDocument.vertices.update(index, { x, y, name })
+currentDocument.vertices.remove(index | indices)
+currentDocument.vertices.clear()
+currentDocument.vertices.renameSelected(baseName)</code></pre>
+					<h3>Groups</h3>
+					<p>Groups render their member vertices with their own primitive type. Creating a group returns its ID for later updates or removal.</p>
+					<pre><code class="lang-javascript">currentDocument.groups.list()
+currentDocument.groups.get(id)
+currentDocument.groups.create(indices, { name?, primitiveType? })
+currentDocument.groups.update(id, { name, primitiveType, indices })
+currentDocument.groups.remove(id)
+currentDocument.groups.ungroup(id)</code></pre>
+					<h3>Selection and view</h3>
+					<p>Selection methods control the highlighted vertices. View methods recenter the canvas or restore its default position and zoom.</p>
+					<pre><code class="lang-javascript">currentDocument.selection.get()
+currentDocument.selection.set(indices)
+currentDocument.selection.clear()
+
+currentDocument.view.centerOn(indices)
+currentDocument.view.reset()
+currentDocument.getPrimitiveType()</code></pre>
+				</article>
+				<div id="api-documentation-separator" role="separator" aria-label="Resize documentation" aria-orientation="horizontal" title="Resize documentation" hidden></div>
+				<div id="shader-editor"></div>
+				<div id="code-panel-footer">
+					<span id="shader-status">Coding ready</span>
+					<button id="run-code" type="button">Run</button>
+				</div>
+				<div id="code-panel-resize" role="separator" aria-label="Resize coding panel" title="Resize coding panel"></div>
+			</aside>
+			<button id="code-panel-handle" type="button" aria-label="Show coding panel" aria-expanded="false">&lt;</button>
 		</div>
 	</div>
 	<div id="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-dialog-title" hidden>

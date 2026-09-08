@@ -144,16 +144,248 @@ button {
 	height: calc(100vh - 54px);
 	overflow: hidden;
 	--sidebar-width: 280px;
-	transition: padding-left 160ms ease;
+	--code-panel-width: 280px;
+	transition: padding 160ms ease;
 }
 
 #content.is-pinned {
 	padding-left: var(--sidebar-width);
 }
 
+#content.is-code-panel-pinned {
+	padding-right: var(--code-panel-width);
+}
+
 #content.is-resizing,
-#content.is-resizing #sidebar-handle {
+#content.is-resizing #sidebar-handle,
+#content.is-resizing #code-panel-handle {
 	transition: none;
+}
+
+#code-panel {
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	z-index: 6;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	width: var(--code-panel-width);
+	height: 100%;
+	border-left: 1px solid var(--control-border);
+	background: var(--surface);
+	transform: translateX(100%);
+	transition: transform 160ms ease;
+}
+
+#code-panel.is-open {
+	transform: translateX(0px);
+}
+
+#code-panel.is-pinned #code-panel-pin {
+	background: var(--button-active);
+}
+
+#code-panel-header,
+#code-panel-footer,
+#code-controls {
+	min-width: 0px;
+	gap: 4px;
+	border-bottom: 1px solid var(--control-border);
+}
+
+#code-tabs {
+	display: flex;
+	min-width: 0px;
+	flex: 1 1 auto;
+	gap: 2px;
+	overflow-x: auto;
+}
+
+.code-tab {
+	width: auto;
+	min-width: 72px;
+	max-width: 140px;
+	height: 26px;
+	margin: 0px;
+	padding: 0px 9px;
+	border-radius: 5px;
+	font-size: 12px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.code-tab[aria-selected="true"] {
+	background: var(--button-active);
+}
+
+#code-controls button {
+	width: auto;
+	height: 26px;
+	margin: 0px;
+	padding: 0px 8px;
+	border-radius: 5px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+#new-code-tab {
+	font-size: 18px;
+	line-height: 1;
+}
+
+
+#code-controls {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px;
+}
+
+#code-controls select {
+	width: auto;
+	min-width: 0px;
+	height: 28px;
+	border-radius: 5px;
+	font-size: 12px;
+}
+
+#code-panel-header,
+#code-panel-footer {
+	justify-content: space-between;
+	border-bottom: 1px solid var(--control-border);
+}
+
+#code-panel-footer {
+	border-top: 1px solid var(--control-border);
+	border-bottom: 0px;
+	font-size: 12px;
+}
+
+#code-panel-footer button {
+	width: auto;
+	height: 26px;
+	margin: 0px;
+	padding: 0px 10px;
+	border-radius: 13px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+#code-panel-pin {
+	width: auto;
+	height: 24px;
+	margin: 0px;
+	padding: 0px 8px;
+	border-radius: 12px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+#shader-tabs {
+	gap: 4px;
+	padding-bottom: 6px;
+}
+
+#shader-editor {
+	flex: 1 1 auto;
+	min-height: 0px;
+}
+
+#api-documentation {
+	flex: 0 0 var(--api-documentation-height, 45%);
+	min-height: 0px;
+	margin: 0px;
+	padding: 0px 12px 12px;
+	overflow: auto;
+	font-size: 13px;
+	line-height: 1.45;
+	user-select: text;
+}
+
+#api-documentation h2,
+#api-documentation h3 {
+	margin: 12px 0px 6px;
+}
+
+#api-documentation h2 {
+	font-size: 16px;
+}
+
+#api-documentation h3 {
+	font-size: 13px;
+}
+
+#api-documentation p {
+	margin: 0px 0px 8px;
+}
+
+#api-documentation pre {
+	margin: 0px;
+	padding: 8px;
+	border: 1px solid var(--control-border);
+	border-radius: 6px;
+	background: var(--control-active);
+	overflow-x: auto;
+}
+
+#api-documentation-separator {
+	position: relative;
+	flex: 0 0 7px;
+	cursor: row-resize;
+	background:
+		linear-gradient(var(--control-border), var(--control-border)) left center / calc(50% - 22px) 1px no-repeat,
+		linear-gradient(var(--control-border), var(--control-border)) right center / calc(50% - 22px) 1px no-repeat,
+		var(--surface);
+}
+
+#api-documentation-separator::after {
+	position: absolute;
+	top: 2px;
+	left: 50%;
+	width: 20px;
+	height: 2px;
+	transform: translateX(-50%);
+	border-top: 1px dotted var(--foreground);
+	border-bottom: 1px dotted var(--foreground);
+	content: "";
+	opacity: 0.45;
+}
+
+#api-documentation-separator:hover {
+	background: var(--control-active);
+}
+
+#code-panel-handle {
+	position: absolute;
+	top: 50%;
+	right: 0px;
+	z-index: 5;
+	width: 24px;
+	height: 64px;
+	margin: -32px 0px 0px;
+	padding: 0px;
+	border-right: none;
+	border-radius: 12px 0px 0px 12px;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	transition: right 160ms ease;
+}
+
+#code-panel-handle.is-open {
+	right: var(--code-panel-width);
+}
+
+#code-panel-handle.is-pinned {
+	display: none;
+}
+
+/* Monaco mounts context menus outside the editor; keep them above the panel handle. */
+body > .context-view {
+	z-index: 7;
 }
 
 #vertex-sidebar {
@@ -423,6 +655,54 @@ button {
 	position: absolute;
 	top: 0px;
 	right: -4px;
+	width: 8px;
+	height: 100%;
+	cursor: ew-resize;
+}
+
+#vertex-sidebar.is-pinned #sidebar-resize,
+#code-panel.is-pinned #code-panel-resize {
+	background:
+		linear-gradient(var(--control-border), var(--control-border)) center top / 1px calc(50% - 22px) no-repeat,
+		linear-gradient(var(--control-border), var(--control-border)) center bottom / 1px calc(50% - 22px) no-repeat;
+}
+
+#vertex-sidebar.is-pinned {
+	border-right-color: transparent;
+	padding-right: 18px;
+}
+
+#code-panel.is-pinned {
+	border-left-color: transparent;
+	padding-left: 8px;
+}
+
+#vertex-sidebar.is-pinned #sidebar-resize {
+	right: 0px;
+}
+
+#code-panel.is-pinned #code-panel-resize {
+	left: 0px;
+}
+
+#vertex-sidebar.is-pinned #sidebar-resize::after,
+#code-panel.is-pinned #code-panel-resize::after {
+	position: absolute;
+	top: 50%;
+	left: 3px;
+	width: 2px;
+	height: 20px;
+	transform: translateY(-50%);
+	border-left: 1px dotted var(--foreground);
+	border-right: 1px dotted var(--foreground);
+	content: "";
+	opacity: 0.45;
+}
+
+#code-panel-resize {
+	position: absolute;
+	top: 0px;
+	left: -4px;
 	width: 8px;
 	height: 100%;
 	cursor: ew-resize;

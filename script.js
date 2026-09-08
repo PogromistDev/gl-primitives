@@ -13,6 +13,17 @@ const toolDraw = document.getElementById("tool-draw");
 const toolMove = document.getElementById("tool-move");
 const snapToGridCheckbox = document.getElementById("snap-to-grid");
 const themeToggle = document.getElementById("theme-toggle");
+const codePanel = document.getElementById("code-panel");
+const codePanelHandle = document.getElementById("code-panel-handle");
+const codePanelPin = document.getElementById("code-panel-pin");
+const codePanelResize = document.getElementById("code-panel-resize");
+const shaderEditorContainer = document.getElementById("shader-editor");
+const shaderStatus = document.getElementById("shader-status");
+const runCodeButton = document.getElementById("run-code");
+const codeMode = document.getElementById("code-mode");
+const codeExample = document.getElementById("code-example");
+const apiDocumentation = document.getElementById("api-documentation");
+const apiDocumentationSeparator = document.getElementById("api-documentation-separator");
 const vertexSidebar = document.getElementById("vertex-sidebar");
 const sidebarHandle = document.getElementById("sidebar-handle");
 const sidebarPin = document.getElementById("sidebar-pin");
@@ -27,6 +38,7 @@ const themeNames = ["system", "light", "dark"];
 const themeStorageKey = "gl-primitives-theme";
 const stateStorageKey = "gl-primitives-state";
 const pendingStateStorageKey = "gl-primitives-pending";
+const layoutStorageKey = "gl-primitives-layout";
 const saveDialog = document.getElementById("save-dialog");
 const saveChangesButton = document.getElementById("save-changes");
 const discardChangesButton = document.getElementById("discard-changes");
@@ -108,16 +120,315 @@ var sidebarOpen = false;
 var sidebarPinned = false;
 var sidebarWidth = 280;
 var isResizingSidebar = false;
+var codePanelOpen = false;
+var codePanelPinned = false;
+var codePanelWidth = 280;
+var isResizingCodePanel = false;
+var isResizingDocumentation = false;
 var renderedVertexState = "";
 var renamingVertexIndex = null;
 var renamingVertexIndices = [];
 var renamingGroupId = null;
 var isRenderingVertexList = false;
 var savedStateJson = "";
+var monacoEditor = null;
+var shaderModels = {};
+var codeModels = {};
+var activeCodeMode = "api";
+var shaderEditorReady = false;
+var restoredCodingState = null;
+
+const apiExamples = {
+	"add-points": {
+		label: "Add points",
+		code: `const first = currentDocument.vertices.create(-0.6, 0.3, "First");
+currentDocument.vertices.create(0.0, 0.0, "Center");
+currentDocument.vertices.create(0.6, -0.3, "Last");
+currentDocument.selection.set([first]);`
+	},
+	"make-group": {
+		label: "Create a group",
+		code: `const indices = currentDocument.vertices.createMany([
+  { x: -0.5, y: 0.2 },
+  { x: 0.0, y: 0.7 },
+  { x: 0.5, y: 0.2 }
+]);
+currentDocument.groups.create(indices, { name: "Triangle", primitiveType: "GL_LINE_LOOP" });`
+	},
+	"rename-selection": {
+		label: "Rename selection",
+		code: `currentDocument.vertices.renameSelected("Point");`
+	},
+	"clear-scene": {
+		label: "Clear scene",
+		code: `currentDocument.vertices.clear();`
+	}
+};
+
+const canvasDocumentTypeDefinitions = `
+/** A vertex in the canvas document. */
+interface CanvasVertex {
+\tindex: number;
+\tx: number;
+\ty: number;
+\tname: string;
+}
+
+/** A render group in the canvas document. */
+interface CanvasGroup {
+\tid: number;
+\tname: string;
+\tprimitiveType: number;
+\tindices: number[];
+}
+
+interface CanvasVertexInput {
+\tx: number;
+\ty: number;
+\tname?: string;
+}
+
+/** Application-specific canvas scripting API. */
+interface CurrentDocument {
+\t/** Create, query, update, and remove canvas vertices. */
+\tvertices: {
+\t\tlist(): CanvasVertex[];
+\t\tget(index: number): CanvasVertex | null;
+\t\tcreate(x: number, y: number, name?: string): number;
+\t\tcreateMany(entries: CanvasVertexInput[]): number[];
+\t\tupdate(index: number, patch?: Partial<Pick<CanvasVertex, "x" | "y" | "name">>): CanvasVertex | null;
+\t\tremove(indices: number | number[]): void;
+\t\tclear(): void;
+\t\trenameSelected(baseName: string): void;
+\t};
+\t/** Create and manage primitive render groups. */
+\tgroups: {
+\t\tlist(): CanvasGroup[];
+\t\tget(id: number): CanvasGroup | null;
+\t\tcreate(indices: number[], options?: { name?: string; primitiveType?: number | string }): number;
+\t\tupdate(id: number, patch?: Partial<Pick<CanvasGroup, "name" | "primitiveType" | "indices">>): CanvasGroup | null;
+\t\tremove(id: number): boolean;
+\t\tungroup(id: number): boolean;
+\t};
+\t/** Read and change the selected vertex indices. */
+\tselection: {
+\t\tget(): number[];
+\t\tset(indices: number[]): void;
+\t\tclear(): void;
+\t};
+\t/** Center or reset the canvas viewport. */
+\tview: {
+\t\tcenterOn(indices: number[]): void;
+\t\treset(): void;
+\t};
+\tgetPrimitiveType(): string;
+}
+
+declare const currentDocument: CurrentDocument;
+`;
+
+Object.entries(apiExamples).forEach(([value, example]) => {
+	const option = document.createElement("option");
+	option.value = value;
+	option.textContent = example.label;
+	codeExample.appendChild(option);
+});
+
+function updateCodePanelLayout() {
+	const content = document.getElementById("content");
+	content.style.setProperty("--code-panel-width", `${codePanelWidth}px`);
+	content.classList.toggle("is-code-panel-pinned", codePanelPinned);
+	codePanel.classList.toggle("is-pinned", codePanelPinned);
+	const isOpen = codePanelPinned || codePanelOpen;
+	codePanel.classList.toggle("is-open", isOpen);
+	codePanelHandle.classList.toggle("is-open", isOpen);
+	codePanelHandle.classList.toggle("is-pinned", codePanelPinned);
+	codePanelHandle.textContent = isOpen ? ">" : "<";
+	codePanelHandle.setAttribute("aria-expanded", isOpen);
+	codePanelHandle.setAttribute("aria-label", `${isOpen ? "Hide" : "Show"} coding panel`);
+	codePanelPin.textContent = codePanelPinned ? "unpin" : "pin";
+	codePanelPin.setAttribute("aria-label", `${codePanelPinned ? "Unpin" : "Pin"} coding panel`);
+	codePanelPin.setAttribute("title", `${codePanelPinned ? "Unpin" : "Pin"} coding panel`);
+	codePanelPin.setAttribute("aria-pressed", codePanelPinned);
+	if (isOpen && monacoEditor) requestAnimationFrame(() => monacoEditor.layout());
+	adjustCanvasSize();
+}
+
+codePanelHandle.addEventListener("click", () => {
+	if (!codePanelPinned) codePanelOpen = !codePanelOpen;
+	updateCodePanelLayout();
+	saveLayout();
+});
+
+codePanelPin.addEventListener("click", () => {
+	codePanelPinned = !codePanelPinned;
+	codePanelOpen = true;
+	updateCodePanelLayout();
+	saveLayout();
+});
+
+codePanelResize.addEventListener("mousedown", event => {
+	event.preventDefault();
+	isResizingCodePanel = true;
+	document.getElementById("content").classList.add("is-resizing");
+	document.body.style.cursor = "ew-resize";
+});
+
+apiDocumentationSeparator.addEventListener("mousedown", event => {
+	event.preventDefault();
+	isResizingDocumentation = true;
+	document.body.style.cursor = "row-resize";
+});
+
+function initializeShaderEditor() {
+	if (!window.require) return;
+	window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" } });
+	window.require(["vs/editor/editor.main"], () => {
+		defineMonacoThemes();
+		monaco.languages.typescript.javascriptDefaults.addExtraLib(canvasDocumentTypeDefinitions, "ts:canvas-document-api.d.ts");
+		codeModels.api = monaco.editor.createModel(restoredCodingState?.apiSource || apiExamples["add-points"].code, "javascript");
+		codeModels.vertex = monaco.editor.createModel(restoredCodingState?.vertexSource || vertexShaderString || "", "glsl");
+		codeModels.fragment = monaco.editor.createModel(restoredCodingState?.fragmentSource || fragmentShaderString || "", "glsl");
+		monacoEditor = monaco.editor.create(shaderEditorContainer, {
+			model: codeModels.api,
+			theme: activeTheme === "dark" ? "gl-primitives-vscode-dark" : "gl-primitives-vscode-light",
+			automaticLayout: true,
+			minimap: { enabled: false },
+			fontSize: 13,
+			padding: { top: 8 },
+			scrollBeyondLastLine: false,
+			wordWrap: "on"
+		});
+		apiDocumentation.querySelectorAll("code.lang-javascript").forEach(code => monaco.editor.colorizeElement(code, { tabSize: 2 }));
+		shaderEditorReady = true;
+		applyCodingState(restoredCodingState);
+	});
+}
+
+function defineMonacoThemes() {
+	monaco.editor.defineTheme("gl-primitives-vscode-dark", {
+		base: "vs-dark",
+		inherit: true,
+		semanticHighlighting: true,
+		colors: {
+			"editor.background": "#1e1e1e",
+			"editorLineNumber.foreground": "#858585",
+			"editorLineNumber.activeForeground": "#c6c6c6"
+		},
+		rules: [
+			{ token: "comment", foreground: "6A9955" },
+			{ token: "string", foreground: "CE9178" },
+			{ token: "number", foreground: "B5CEA8" },
+			{ token: "keyword", foreground: "C586C0" },
+			{ token: "type", foreground: "4EC9B0" },
+			{ token: "identifier", foreground: "9CDCFE" },
+			{ token: "delimiter", foreground: "D4D4D4" }
+		],
+		semanticTokenColors: {
+			variable: "#9CDCFE",
+			property: "#4EC9B0",
+			method: "#DCDCAA",
+			function: "#DCDCAA",
+			parameter: "#9CDCFE",
+			type: "#4EC9B0"
+		}
+	});
+	monaco.editor.defineTheme("gl-primitives-vscode-light", {
+		base: "vs",
+		inherit: true,
+		semanticHighlighting: true,
+		rules: [
+			{ token: "comment", foreground: "008000" },
+			{ token: "string", foreground: "A31515" },
+			{ token: "number", foreground: "098658" },
+			{ token: "keyword", foreground: "AF00DB" },
+			{ token: "type", foreground: "267F99" },
+			{ token: "identifier", foreground: "001080" }
+		],
+		semanticTokenColors: {
+			variable: "#001080",
+			property: "#267F99",
+			method: "#795E26",
+			function: "#795E26",
+			type: "#267F99"
+		}
+	});
+}
+
+function applyCodingState(codingState) {
+	if (!codingState) return;
+	if (["api", "vertex", "fragment"].includes(codingState.activeMode)) activeCodeMode = codingState.activeMode;
+	if (monacoEditor) {
+		if (typeof codingState.apiSource === "string") codeModels.api.setValue(codingState.apiSource);
+		if (typeof codingState.vertexSource === "string") codeModels.vertex.setValue(codingState.vertexSource);
+		if (typeof codingState.fragmentSource === "string") codeModels.fragment.setValue(codingState.fragmentSource);
+	}
+	codeMode.value = activeCodeMode;
+	const selectedExample = Array.from(codeExample.options).some(option => option.value === codingState.example) ? codingState.example : "blank";
+	codeExample.value = selectedExample;
+	codeExample.hidden = activeCodeMode !== "api";
+	const showingDocumentation = activeCodeMode === "api" && Boolean(codingState.showDocumentation);
+	apiDocumentation.hidden = !showingDocumentation;
+	apiDocumentationSeparator.hidden = !showingDocumentation;
+	if (monacoEditor) {
+		monacoEditor.setModel(codeModels[activeCodeMode]);
+		requestAnimationFrame(() => monacoEditor.layout());
+	}
+	shaderStatus.textContent = activeCodeMode === "api" ? "Coding ready" : "Shader editor ready";
+}
+
+codeMode.addEventListener("change", () => {
+	activeCodeMode = codeMode.value;
+	codeExample.value = "blank";
+	codeExample.hidden = activeCodeMode !== "api";
+	apiDocumentation.hidden = true;
+	apiDocumentationSeparator.hidden = true;
+	if (monacoEditor) monacoEditor.setModel(codeModels[activeCodeMode]);
+	shaderStatus.textContent = activeCodeMode === "api" ? "Coding ready" : "Shader editor ready";
+});
+
+codeExample.addEventListener("change", () => {
+	const showingDocumentation = codeExample.value === "api-documentation";
+	apiDocumentation.hidden = !showingDocumentation;
+	apiDocumentationSeparator.hidden = !showingDocumentation;
+	if (showingDocumentation) {
+		if (monacoEditor) requestAnimationFrame(() => monacoEditor.layout());
+		return;
+	}
+	const example = apiExamples[codeExample.value];
+	if (!example || !monacoEditor || activeCodeMode !== "api") return;
+	codeModels.api.setValue(example.code);
+	monacoEditor.setPosition({ lineNumber: 1, column: 1 });
+	monacoEditor.focus();
+});
+
+runCodeButton.addEventListener("click", () => {
+	if (!shaderEditorReady) return;
+	if (activeCodeMode === "api") {
+		try {
+			const run = new Function("canvas", "currentDocument", monacoEditor.getValue());
+			run(canvas, canvasDocumentApi);
+			shaderStatus.textContent = "Code ran successfully";
+		} catch (error) {
+			shaderStatus.textContent = `Error: ${error.message}`;
+			console.error(error);
+		}
+		return;
+	}
+	const nextVertex = codeModels.vertex.getValue();
+	const nextFragment = codeModels.fragment.getValue();
+	if (!compileShaderProgram(nextVertex, nextFragment)) {
+		shaderStatus.textContent = "Compile failed";
+		return;
+	}
+	vertexShaderString = nextVertex;
+	fragmentShaderString = nextFragment;
+	shaderStatus.textContent = "Shaders applied";
+});
 
 function getAppState() {
 	return {
-		version: 2,
+		version: 3,
 		theme: selectedTheme,
 		primitiveType: mode,
 		tool: currentTool,
@@ -131,8 +442,57 @@ function getAppState() {
 		snappingEnabled,
 		zoomFromCursor,
 		panSnapEnabled,
-		showInfo
+		showInfo,
+		sidebarOpen,
+		sidebarPinned,
+		sidebarWidth,
+		codePanelOpen,
+		codePanelPinned,
+		codePanelWidth,
+		apiDocumentationHeight: codePanel.style.getPropertyValue("--api-documentation-height"),
+		coding: {
+			activeMode: activeCodeMode,
+			example: codeExample.value,
+			showDocumentation: !apiDocumentation.hidden,
+			apiSource: codeModels.api?.getValue() ?? restoredCodingState?.apiSource ?? apiExamples["add-points"].code,
+			vertexSource: codeModels.vertex?.getValue() ?? restoredCodingState?.vertexSource ?? vertexShaderString ?? "",
+			fragmentSource: codeModels.fragment?.getValue() ?? restoredCodingState?.fragmentSource ?? fragmentShaderString ?? ""
+		}
 	};
+}
+
+function getLayoutState() {
+	return {
+		sidebarOpen,
+		sidebarPinned,
+		sidebarWidth,
+		codePanelOpen,
+		codePanelPinned,
+		codePanelWidth,
+		apiDocumentationHeight: codePanel.style.getPropertyValue("--api-documentation-height")
+	};
+}
+
+function saveLayout() {
+	localStorage.setItem(layoutStorageKey, JSON.stringify(getLayoutState()));
+}
+
+function restoreLayout(layoutJson) {
+	try {
+		const layout = JSON.parse(layoutJson);
+		if (typeof layout.sidebarOpen === "boolean") sidebarOpen = layout.sidebarOpen;
+		if (typeof layout.sidebarPinned === "boolean") sidebarPinned = layout.sidebarPinned;
+		if (Number.isFinite(layout.sidebarWidth)) sidebarWidth = Math.max(220, Math.min(420, layout.sidebarWidth));
+		if (typeof layout.codePanelOpen === "boolean") codePanelOpen = layout.codePanelOpen;
+		if (typeof layout.codePanelPinned === "boolean") codePanelPinned = layout.codePanelPinned;
+		if (Number.isFinite(layout.codePanelWidth)) codePanelWidth = Math.max(220, Math.min(756, layout.codePanelWidth));
+		if (typeof layout.apiDocumentationHeight === "string" && /^\d+(?:\.\d+)?px$/.test(layout.apiDocumentationHeight)) {
+			codePanel.style.setProperty("--api-documentation-height", layout.apiDocumentationHeight);
+		}
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 function getAppStateJson() {
@@ -148,7 +508,7 @@ function saveAppState(stateJson = getAppStateJson()) {
 function restoreAppState(stateJson) {
 	try {
 		const state = JSON.parse(stateJson);
-		if (!state || ![1, 2].includes(state.version)) return false;
+		if (!state || ![1, 2, 3].includes(state.version)) return false;
 		if (themeNames.includes(state.theme)) selectedTheme = state.theme;
 		mode = Number.isInteger(state.primitiveType) ? Math.max(0, Math.min(6, state.primitiveType)) : mode;
 		if (["pan", "select", "draw", "move"].includes(state.tool)) currentTool = state.tool;
@@ -173,6 +533,19 @@ function restoreAppState(stateJson) {
 		zoomFromCursor = Boolean(state.zoomFromCursor);
 		panSnapEnabled = Boolean(state.panSnapEnabled);
 		showInfo = state.showInfo !== false;
+		if (typeof state.sidebarOpen === "boolean") sidebarOpen = state.sidebarOpen;
+		if (typeof state.sidebarPinned === "boolean") sidebarPinned = state.sidebarPinned;
+		if (Number.isFinite(state.sidebarWidth)) sidebarWidth = Math.max(220, Math.min(420, state.sidebarWidth));
+		if (typeof state.codePanelOpen === "boolean") codePanelOpen = state.codePanelOpen;
+		if (typeof state.codePanelPinned === "boolean") codePanelPinned = state.codePanelPinned;
+		if (Number.isFinite(state.codePanelWidth)) codePanelWidth = Math.max(220, Math.min(756, state.codePanelWidth));
+		if (typeof state.apiDocumentationHeight === "string" && /^\d+(?:\.\d+)?px$/.test(state.apiDocumentationHeight)) {
+			codePanel.style.setProperty("--api-documentation-height", state.apiDocumentationHeight);
+		}
+		if (state.coding && typeof state.coding === "object") {
+			restoredCodingState = state.coding;
+			applyCodingState(restoredCodingState);
+		}
 		selectionAnchorIndex = selectedVertices.at(-1) ?? null;
 		return true;
 	} catch {
@@ -184,6 +557,8 @@ function openSaveDialog(pendingJson) {
 	saveDialog.hidden = false;
 	saveChangesButton.onclick = () => {
 		restoreAppState(pendingJson);
+		updateSidebarLayout();
+		updateCodePanelLayout();
 		applyTheme();
 		glPrimitiveType.selectedIndex = mode;
 		updateActiveButton();
@@ -475,6 +850,7 @@ sidebarHandle.addEventListener("click", () => {
 	updateSidebarLayout();
 	sidebarHandle.setAttribute("aria-expanded", sidebarOpen);
 	sidebarHandle.setAttribute("aria-label", `${sidebarOpen ? "Hide" : "Show"} vertex sidebar`);
+	saveLayout();
 });
 
 sidebarPin.addEventListener("click", () => {
@@ -482,6 +858,7 @@ sidebarPin.addEventListener("click", () => {
 	sidebarOpen = true;
 	updateSidebarLayout();
 	sidebarHandle.setAttribute("aria-expanded", true);
+	saveLayout();
 });
 
 sidebarResize.addEventListener("mousedown", event => {
@@ -492,17 +869,35 @@ sidebarResize.addEventListener("mousedown", event => {
 });
 
 window.addEventListener("mousemove", event => {
-	if (!isResizingSidebar) return;
-	const sidebarLeft = vertexSidebar.getBoundingClientRect().left;
-	sidebarWidth = Math.max(220, Math.min(420, event.clientX - sidebarLeft));
-	updateSidebarLayout();
+	if (isResizingSidebar) {
+		const sidebarLeft = vertexSidebar.getBoundingClientRect().left;
+		sidebarWidth = Math.max(220, Math.min(420, event.clientX - sidebarLeft));
+		updateSidebarLayout();
+	}
+	if (isResizingCodePanel) {
+		const panelRight = codePanel.getBoundingClientRect().right;
+		codePanelWidth = Math.max(220, Math.min(756, panelRight - event.clientX));
+		updateCodePanelLayout();
+	}
+	if (isResizingDocumentation) {
+		const documentationTop = apiDocumentation.getBoundingClientRect().top;
+		const panelHeight = codePanel.getBoundingClientRect().height;
+		const documentationHeight = Math.max(120, Math.min(panelHeight - 160, event.clientY - documentationTop));
+		codePanel.style.setProperty("--api-documentation-height", `${documentationHeight}px`);
+		if (monacoEditor) monacoEditor.layout();
+	}
 });
 
 window.addEventListener("mouseup", () => {
-	if (!isResizingSidebar) return;
-	isResizingSidebar = false;
-	document.getElementById("content").classList.remove("is-resizing");
-	document.body.style.cursor = "";
+	const layoutChanged = isResizingSidebar || isResizingCodePanel || isResizingDocumentation;
+	if (isResizingSidebar) isResizingSidebar = false;
+	if (isResizingCodePanel) isResizingCodePanel = false;
+	if (isResizingDocumentation) isResizingDocumentation = false;
+	if (!isResizingSidebar && !isResizingCodePanel) {
+		document.getElementById("content").classList.remove("is-resizing");
+		document.body.style.cursor = "";
+	}
+	if (layoutChanged) saveLayout();
 });
 
 function getActiveTheme() {
@@ -520,6 +915,9 @@ function applyTheme() {
 	const label = `Theme: ${selectedTheme[0].toUpperCase()}${selectedTheme.slice(1)}`;
 	themeToggle.textContent = label;
 	themeToggle.setAttribute("aria-label", `Color theme: ${label.slice(7)}`);
+	if (window.monaco && monacoEditor) {
+		monaco.editor.setTheme(activeTheme === "dark" ? "gl-primitives-vscode-dark" : "gl-primitives-vscode-light");
+	}
 }
 
 themeToggle.addEventListener("click", () => {
@@ -543,8 +941,12 @@ else {
 	const storedTheme = localStorage.getItem(themeStorageKey);
 	if (themeNames.includes(storedTheme)) selectedTheme = storedTheme;
 }
+const storedLayout = localStorage.getItem(layoutStorageKey);
+if (storedLayout) restoreLayout(storedLayout);
 localStorage.removeItem(themeStorageKey);
 applyTheme();
+updateSidebarLayout();
+updateCodePanelLayout();
 
 const pendingState = localStorage.getItem(pendingStateStorageKey);
 if (pendingState) openSaveDialog(pendingState);
@@ -559,10 +961,20 @@ window.addEventListener("beforeunload", event => {
 
 saveChangesButton.addEventListener("click", () => saveAppState());
 
+window.addEventListener("keydown", event => {
+	if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+		event.preventDefault();
+		saveAppState();
+		shaderStatus.textContent = "Saved";
+	}
+}, true);
+
 discardChangesButton.addEventListener("click", () => {
 	localStorage.removeItem(pendingStateStorageKey);
 	const stored = localStorage.getItem(stateStorageKey);
 	if (stored) restoreAppState(stored);
+	updateSidebarLayout();
+	updateCodePanelLayout();
 	applyTheme();
 	renderedVertexState = "";
 	renderVertexList();
@@ -1002,6 +1414,7 @@ Promise.all([
 		initializeWebGL();
 		await makeShaders(shaders);
 		initBuffers();
+		initializeShaderEditor();
 
 		glPrimitiveType.selectedIndex = mode;
 		updateActiveButton();
@@ -1011,7 +1424,8 @@ Promise.all([
 
 function adjustCanvasSize() {
 	const content = document.getElementById("content");
-	const canvasWidth = sidebarPinned ? content.clientWidth - sidebarWidth : window.innerWidth;
+	const pinnedWidth = (sidebarPinned ? sidebarWidth : 0) + (codePanelPinned ? codePanelWidth : 0);
+	const canvasWidth = content.clientWidth - pinnedWidth;
 	canvas.width = canvas_info.width = Math.max(1, canvasWidth);
 	canvas.height = canvas_info.height = window.innerHeight;
 	gl.viewport(0, 0, canvas.width, canvas.height);
@@ -1027,29 +1441,49 @@ function initializeWebGL() {
 async function makeShaders(shaders) {
 	vertexShaderString = await shaders[0].text();
 	fragmentShaderString = await shaders[1].text();
+	if (!compileShaderProgram(vertexShaderString, fragmentShaderString)) {
+		throw new Error("Unable to compile the initial shaders");
+	}
+}
 
-	vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+function compileShaderProgram(nextVertexSource, nextFragmentSource) {
+	const nextVertexShader = gl.createShader(gl.VERTEX_SHADER);
+	const nextFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+	gl.shaderSource(nextVertexShader, nextVertexSource);
+	gl.shaderSource(nextFragmentShader, nextFragmentSource);
+	gl.compileShader(nextVertexShader);
+	gl.compileShader(nextFragmentShader);
 
-	gl.shaderSource(vertexShader, vertexShaderString);
-	gl.shaderSource(fragmentShader, fragmentShaderString);
+	const vertexCompiled = gl.getShaderParameter(nextVertexShader, gl.COMPILE_STATUS);
+	const fragmentCompiled = gl.getShaderParameter(nextFragmentShader, gl.COMPILE_STATUS);
+	if (!vertexCompiled || !fragmentCompiled) {
+		console.error(gl.getShaderInfoLog(nextVertexShader), gl.getShaderInfoLog(nextFragmentShader));
+		gl.deleteShader(nextVertexShader);
+		gl.deleteShader(nextFragmentShader);
+		return false;
+	}
 
-	gl.compileShader(vertexShader);
-	gl.compileShader(fragmentShader);
+	const nextProgram = gl.createProgram();
+	gl.attachShader(nextProgram, nextVertexShader);
+	gl.attachShader(nextProgram, nextFragmentShader);
+	gl.linkProgram(nextProgram);
+	if (!gl.getProgramParameter(nextProgram, gl.LINK_STATUS)) {
+		console.error(gl.getProgramInfoLog(nextProgram));
+		gl.deleteProgram(nextProgram);
+		gl.deleteShader(nextVertexShader);
+		gl.deleteShader(nextFragmentShader);
+		return false;
+	}
 
-	console.log(gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS));
-	console.log(gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS));
-	console.log(gl.getShaderInfoLog(vertexShader));
-	console.log(gl.getShaderInfoLog(fragmentShader));
-
-	shaderProgram = gl.createProgram();
-	gl.attachShader(shaderProgram, vertexShader);
-	gl.attachShader(shaderProgram, fragmentShader);
-	gl.linkProgram(shaderProgram);
-
-	console.log(gl.getProgramParameter(shaderProgram, gl.LINK_STATUS));
-
+	vertexShader = nextVertexShader;
+	fragmentShader = nextFragmentShader;
+	shaderProgram = nextProgram;
 	gl.useProgram(shaderProgram);
+	vertexAttributeLocation = gl.getAttribLocation(shaderProgram, "vertex");
+	offsetUniformLocation = gl.getUniformLocation(shaderProgram, "offset");
+	scaleUniformLocation = gl.getUniformLocation(shaderProgram, "scale");
+	colorUniformLocation = gl.getUniformLocation(shaderProgram, "color");
+	return true;
 }
 
 
@@ -1398,6 +1832,62 @@ function ungroupSelectedVertices() {
 	renderedVertexState = "";
 	renderVertexList();
 }
+
+function markApiChange() {
+	renderedVertexState = "";
+	if (squareVerticesBuffer) {
+		gl.bindBuffer(gl.ARRAY_BUFFER, squareVerticesBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+	}
+	renderVertexList();
+	savedStateJson = "";
+}
+
+function resolvePrimitiveType(value) {
+	if (Number.isInteger(value)) return Math.max(0, Math.min(6, value));
+	const index = Array.from(glPrimitiveType.options).findIndex(option => option.textContent === value);
+	return index >= 0 ? index : mode;
+}
+
+function createApiVertex(x, y, name = "") {
+	const index = vertices.length / 2;
+	vertices.push(Number(x) || 0, Number(y) || 0);
+	vertexNames.push(String(name));
+	return index;
+}
+
+const canvasDocumentApi = {
+	vertices: {
+		list: () => Array.from({ length: vertices.length / 2 }, (_, index) => ({ index, x: vertices[index * 2], y: vertices[index * 2 + 1], name: vertexNames[index] || `Vertex ${index}` })),
+		get: index => canvasDocumentApi.vertices.list().find(vertex => vertex.index === index) || null,
+		create: (x, y, name = "") => { const index = createApiVertex(x, y, name); markApiChange(); return index; },
+		createMany: entries => { const indices = entries.map(entry => createApiVertex(entry.x, entry.y, entry.name || "")); markApiChange(); return indices; },
+		update: (index, patch = {}) => { if (index < 0 || index >= vertices.length / 2) return null; if (Number.isFinite(patch.x)) vertices[index * 2] = patch.x; if (Number.isFinite(patch.y)) vertices[index * 2 + 1] = patch.y; if (patch.name !== undefined) vertexNames[index] = String(patch.name); markApiChange(); return canvasDocumentApi.vertices.get(index); },
+		remove: indices => { selectedVertices = Array.isArray(indices) ? indices : [indices]; deleteSelected(); markApiChange(); },
+		clear: () => { vertices = []; vertexNames = []; vertexGroups = []; selectedVertices = []; selectionAnchorIndex = null; markApiChange(); },
+		renameSelected: baseName => { selectedVertices.forEach((index, order) => { vertexNames[index] = `${baseName} ${order + 1}`; }); markApiChange(); }
+	},
+	groups: {
+		list: () => vertexGroups.map(group => ({ id: group.id, name: group.name, primitiveType: group.primitiveType, indices: [...group.indices] })),
+		get: id => canvasDocumentApi.groups.list().find(group => group.id === id) || null,
+		create: (indices, options = {}) => { const group = { id: nextGroupId++, name: options.name || `Group ${nextGroupId - 1}`, primitiveType: resolvePrimitiveType(options.primitiveType), indices: [...new Set(indices)].filter(index => index >= 0 && index < vertices.length / 2) }; vertexGroups.push(group); markApiChange(); return group.id; },
+		update: (id, patch = {}) => { const group = vertexGroups.find(candidate => candidate.id === id); if (!group) return null; if (patch.name !== undefined) group.name = String(patch.name); if (patch.primitiveType !== undefined) group.primitiveType = resolvePrimitiveType(patch.primitiveType); if (Array.isArray(patch.indices)) group.indices = [...new Set(patch.indices)]; markApiChange(); return canvasDocumentApi.groups.get(id); },
+		remove: id => { const group = vertexGroups.find(candidate => candidate.id === id); if (!group) return false; selectedVertices = [...group.indices]; deleteSelected(); markApiChange(); return true; },
+		ungroup: id => { const before = vertexGroups.length; vertexGroups = vertexGroups.filter(group => group.id !== id); markApiChange(); return vertexGroups.length !== before; }
+	},
+	selection: {
+		get: () => [...selectedVertices],
+		set: indices => { selectedVertices = [...new Set(indices)].filter(index => index >= 0 && index < vertices.length / 2); selectionAnchorIndex = selectedVertices.at(-1) ?? null; markApiChange(); },
+		clear: () => { selectedVertices = []; selectionAnchorIndex = null; markApiChange(); }
+	},
+	view: {
+		centerOn: indices => { centerViewOnVertices(indices); markApiChange(); },
+		reset: () => { offset.x = 0; offset.y = 0; scale.x = 1; markApiChange(); }
+	},
+	getPrimitiveType: () => glPrimitiveType.options[mode].textContent
+};
+
+window.currentDocument = canvasDocumentApi;
 
 groupSelectedButton.addEventListener("click", groupSelectedVertices);
 ungroupSelectedButton.addEventListener("click", ungroupSelectedVertices);
