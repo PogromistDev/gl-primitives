@@ -254,8 +254,12 @@ button {
 
 #code-panel-header,
 #code-panel-footer {
-	justify-content: space-between;
-	border-bottom: 1px solid var(--control-border);
+	display: flex;
+    gap: 6px;
+    padding: 8px;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--control-border);
 }
 
 #code-panel-footer {
