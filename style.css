@@ -43,8 +43,11 @@
 	--button-active: rgb(60, 60, 60);
 }
 
-/* Keep the controls synchronized with the selected theme, including explicit overrides. */
 body {
+	margin: 0px;
+	overflow: hidden;
+	user-select: none;
+	
 	background: var(--background);
 	color: var(--foreground);
 }
@@ -74,25 +77,6 @@ button {
 
 .button-active {
 	background: var(--control-active);
-}
-
-/* System mode is represented by the variables above when no data-theme is set. */
-@media (prefers-color-scheme: light) {
-
-	/* Variables provide the light system defaults. */
-}
-
-
-@media (prefers-color-scheme: dark) {
-
-	/* Variables provide the dark system defaults. */
-}
-
-body {
-	margin: 0px;
-	overflow: hidden;
-	user-select: none;
-	background: var(--background);
 }
 
 #app {
