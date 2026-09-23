@@ -4,7 +4,7 @@
 	--surface: rgba(255, 255, 255, 0.9);
 	--foreground: black;
 	--control-background: white;
-	--control-border: lightgray;
+	--control-border: #d3d3d3;
 	--control-active: rgb(232, 232, 232);
 	--button-active: rgb(200, 200, 200);
 }
@@ -15,7 +15,7 @@
 		--surface: rgba(0, 0, 0, 0.9);
 		--foreground: white;
 		--control-background: rgb(41, 41, 41);
-		--control-border: white;
+		--control-border: #424242;
 		--control-active: rgb(33, 33, 33);
 		--button-active: rgb(60, 60, 60);
 	}
@@ -27,7 +27,7 @@
 	--surface: rgba(255, 255, 255, 0.9);
 	--foreground: black;
 	--control-background: white;
-	--control-border: lightgray;
+	--control-border: #d3d3d3;
 	--control-active: rgb(232, 232, 232);
 	--button-active: rgb(200, 200, 200);
 }
@@ -38,7 +38,7 @@
 	--surface: rgba(0, 0, 0, 0.9);
 	--foreground: white;
 	--control-background: rgb(41, 41, 41);
-	--control-border: white;
+	--control-border: #424242;
 	--control-active: rgb(33, 33, 33);
 	--button-active: rgb(60, 60, 60);
 }
@@ -52,6 +52,7 @@ body {
 #toolbar {
 	background: var(--surface);
 	color: var(--foreground);
+	border-bottom: 1px solid var(--control-border);
 }
 
 select {
@@ -62,7 +63,7 @@ select {
 
 select:active,
 button:active {
-	background: var(--control-active);
+	background: var(--button-active);
 }
 
 button {
@@ -72,7 +73,7 @@ button {
 }
 
 .button-active {
-	background: var(--button-active);
+	background: var(--control-active);
 }
 
 /* System mode is represented by the variables above when no data-theme is set. */
@@ -716,7 +717,7 @@ body > .context-view {
 	display: inline-flex;
 	overflow: hidden;
 	border-radius: 16px;
-    border: 1px solid lightgray;
+    border: 1px solid var(--control-border);
 	margin-left: 12px;
 	margin-right: 12px;
 }
@@ -728,7 +729,7 @@ body > .context-view {
 
 #tools button {
 	border-width: 0px 1px 0px 0px;
-	border-right-color: lightgray;
+	border-right-color: var(--control-border);
 
 	border-radius: 0px;
 
