@@ -349,7 +349,7 @@ button {
 	z-index: 5;
 	width: 16px;
 	height: 48px;
-	margin: -32px 0px 0px;
+	margin: -24px 0px 0px;
 	padding: 0px;
 	border-right: none;
 	border-radius: 4px 0px 0px 4px;
@@ -608,7 +608,7 @@ body > .context-view {
 	z-index: 4;
 	width: 16px;
 	height: 48px;
-	margin: -32px 0px 0px;
+	margin: -24px 0px 0px;
 	padding: 0px;
 	border: 1px solid var(--control-border);
 	border-left: none;
