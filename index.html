@@ -5,40 +5,46 @@
 	<title>GL Primitives Demo</title>
 	<link rel="shortcut icon" href="favicon.png" type="image/png">
 	<link rel="stylesheet" type="text/css" href="style.css">
-	<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs/loader.js"></script>
 	<script src="script.js" defer></script>
 </head>
 
 <body>
 	<div id="app">
 		<div id="toolbar">
-			<span>GL Primitive:</span>
-			<select id="gl-primitive-type">
-				<option>GL_POINTS</option>
-				<option>GL_LINES</option>
-				<option>GL_LINE_LOOP</option>
-				<option>GL_LINE_STRIP</option>
-				<option>GL_TRIANGLES</option>
-				<option>GL_TRIANGLE_STRIP</option>
-				<option>GL_TRIANGLE_FAN</option>
-			</select>
-			<div id="tools">
-				<button id="tool-pan">Pan</button>
-				<button id="tool-select">Select</button>
-				<button id="tool-move">Move</button>
-				<button id="tool-draw">Draw</button>
+			<div id="gl-primitive-type-section">
+				<span>GL Primitive:</span>
+				<select id="gl-primitive-type">
+					<option>GL_POINTS</option>
+					<option>GL_LINES</option>
+					<option>GL_LINE_LOOP</option>
+					<option>GL_LINE_STRIP</option>
+					<option>GL_TRIANGLES</option>
+					<option>GL_TRIANGLE_STRIP</option>
+					<option>GL_TRIANGLE_FAN</option>
+				</select>
 			</div>
-			<label style="display: flex;"><input type="checkbox" id="snap-to-grid"> Snap to Grid</label>
+			<div id="tools-section" style="display: flex; align-items: center;">
+				<div id="tools">
+					<button id="tool-pan">Pan</button>
+					<button id="tool-select">Select</button>
+					<button id="tool-move">Move</button>
+					<button id="tool-draw">Draw</button>
+				</div>
+				<label style="display: flex;"><input type="checkbox" id="snap-to-grid"> Snap to Grid</label>
+			</div>
 			<button id="theme-toggle" type="button" aria-label="Color theme: System">Theme: System</button>
 		</div>
 		<div id="content">
 			<aside id="vertex-sidebar" aria-label="Vertex collection">
 				<div id="vertex-sidebar-header">
-					<strong>Vertices</strong>
-					<div id="vertex-sidebar-actions">
+					<div id="sidebar-vertices">
+						<strong>Vertices</strong>
 						<span id="vertex-count">0</span>
-						<button id="sidebar-pin" type="button" aria-label="Pin sidebar" aria-pressed="false" title="Pin sidebar">pin</button>
 						<button id="clear-vertices" type="button">clear</button>
+					</div>
+					<div id="vertex-sidebar-actions">
+						<button id="sidebar-pin" type="button" aria-label="Pin sidebar" aria-pressed="false" title="Pin sidebar">pin</button>
 					</div>
 				</div>
 				<div id="group-actions">
@@ -57,11 +63,6 @@
 					<button id="code-panel-pin" type="button" aria-label="Pin coding panel" aria-pressed="false" title="Pin coding panel">pin</button>
 				</div>
 				<div id="code-controls">
-					<select id="code-mode" aria-label="Code mode">
-						<option value="api">Coding</option>
-						<option value="vertex">Vertex shader</option>
-						<option value="fragment">Fragment shader</option>
-					</select>
 					<select id="code-example" aria-label="Code example">
 						<option value="blank">Custom code</option>
 						<option value="api-documentation">API Documentation</option>
@@ -72,7 +73,7 @@
 					<p>Use <code>currentDocument</code> in the editor below to create and organize vertices, groups, selections, and the viewport. The browser's <code>document</code> API remains available.</p>
 					<h3>Vertices</h3>
 					<p>Create points individually or in batches. Updates change only the supplied fields; removal accepts one index or a list of indices.</p>
-					<pre><code class="lang-javascript">currentDocument.vertices.list()
+					<pre><code class="lang-javascript" data-lang="javascript">currentDocument.vertices.list()
 currentDocument.vertices.get(index)
 currentDocument.vertices.create(x, y, name?)
 currentDocument.vertices.createMany([{ x, y, name? }])
@@ -82,7 +83,7 @@ currentDocument.vertices.clear()
 currentDocument.vertices.renameSelected(baseName)</code></pre>
 					<h3>Groups</h3>
 					<p>Groups render their member vertices with their own primitive type. Creating a group returns its ID for later updates or removal.</p>
-					<pre><code class="lang-javascript">currentDocument.groups.list()
+					<pre><code class="lang-javascript" data-lang="javascript">currentDocument.groups.list()
 currentDocument.groups.get(id)
 currentDocument.groups.create(indices, { name?, primitiveType? })
 currentDocument.groups.update(id, { name, primitiveType, indices })
@@ -90,7 +91,7 @@ currentDocument.groups.remove(id)
 currentDocument.groups.ungroup(id)</code></pre>
 					<h3>Selection and view</h3>
 					<p>Selection methods control the highlighted vertices. View methods recenter the canvas or restore its default position and zoom.</p>
-					<pre><code class="lang-javascript">currentDocument.selection.get()
+					<pre><code class="lang-javascript" data-lang="javascript">currentDocument.selection.get()
 currentDocument.selection.set(indices)
 currentDocument.selection.clear()
 
@@ -99,10 +100,15 @@ currentDocument.view.reset()
 currentDocument.getPrimitiveType()</code></pre>
 				</article>
 				<div id="api-documentation-separator" role="separator" aria-label="Resize documentation" aria-orientation="horizontal" title="Resize documentation" hidden></div>
-				<div id="shader-editor"></div>
+				<div id="code-editor"></div>
 				<div id="code-panel-footer">
-					<span id="shader-status">Coding ready</span>
-					<button id="run-code" type="button">Run</button>
+					<span id="code-status">Coding ready</span>
+					<button id="run-code" class="round-button" type="button" style="width: 26px; height: 26px; padding: 0px;" title="Run the code">
+						<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="12" height="12">
+							<style>.triangle-run { fill: #75FA61; stroke: var(--control-border);}</style>
+							<path class="triangle-run" d="m6 0l24 16-24 16z"></path>
+						</svg>
+					</button>
 				</div>
 				<div id="code-panel-resize" role="separator" aria-label="Resize coding panel" title="Resize coding panel"></div>
 			</aside>

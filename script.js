@@ -17,10 +17,10 @@ const codePanel = document.getElementById("code-panel");
 const codePanelHandle = document.getElementById("code-panel-handle");
 const codePanelPin = document.getElementById("code-panel-pin");
 const codePanelResize = document.getElementById("code-panel-resize");
-const shaderEditorContainer = document.getElementById("shader-editor");
-const shaderStatus = document.getElementById("shader-status");
+const codeEditorContainer = document.getElementById("code-editor");
+const codeStatus = document.getElementById("code-status");
 const runCodeButton = document.getElementById("run-code");
-const codeMode = document.getElementById("code-mode");
+
 const codeExample = document.getElementById("code-example");
 const apiDocumentation = document.getElementById("api-documentation");
 const apiDocumentationSeparator = document.getElementById("api-documentation-separator");
@@ -135,7 +135,7 @@ var monacoEditor = null;
 var shaderModels = {};
 var codeModels = {};
 var activeCodeMode = "api";
-var shaderEditorReady = false;
+
 var restoredCodingState = null;
 
 const apiExamples = {
@@ -282,36 +282,41 @@ apiDocumentationSeparator.addEventListener("mousedown", event => {
 
 function initializeShaderEditor() {
 	if (!window.require) return;
-	window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" } });
+	window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs" } });
 	window.require(["vs/editor/editor.main"], () => {
+
 		defineMonacoThemes();
+
 		monaco.languages.typescript.javascriptDefaults.addExtraLib(canvasDocumentTypeDefinitions, "ts:canvas-document-api.d.ts");
+
 		codeModels.api = monaco.editor.createModel(restoredCodingState?.apiSource || apiExamples["add-points"].code, "javascript");
-		codeModels.vertex = monaco.editor.createModel(restoredCodingState?.vertexSource || vertexShaderString || "", "glsl");
-		codeModels.fragment = monaco.editor.createModel(restoredCodingState?.fragmentSource || fragmentShaderString || "", "glsl");
-		monacoEditor = monaco.editor.create(shaderEditorContainer, {
+
+		monacoEditor = monaco.editor.create(codeEditorContainer, {
 			model: codeModels.api,
 			theme: activeTheme === "dark" ? "gl-primitives-vscode-dark" : "gl-primitives-vscode-light",
 			automaticLayout: true,
 			minimap: { enabled: false },
 			fontSize: 13,
 			padding: { top: 8 },
-			scrollBeyondLastLine: false,
+			scrollBeyondLastLine: true,
 			wordWrap: "on"
 		});
+
 		apiDocumentation.querySelectorAll("code.lang-javascript").forEach(code => monaco.editor.colorizeElement(code, { tabSize: 2 }));
-		shaderEditorReady = true;
+
 		applyCodingState(restoredCodingState);
 	});
 }
 
 function defineMonacoThemes() {
+
 	monaco.editor.defineTheme("gl-primitives-vscode-dark", {
 		base: "vs-dark",
 		inherit: true,
 		semanticHighlighting: true,
 		colors: {
 			"editor.background": "#1e1e1e",
+			"editor.foreground": "#ffffff",
 			"editorLineNumber.foreground": "#858585",
 			"editorLineNumber.activeForeground": "#c6c6c6"
 		},
@@ -333,10 +338,17 @@ function defineMonacoThemes() {
 			type: "#4EC9B0"
 		}
 	});
+
 	monaco.editor.defineTheme("gl-primitives-vscode-light", {
 		base: "vs",
 		inherit: true,
 		semanticHighlighting: true,
+		colors: {
+			"editor.background": "#ffffff",
+			"editor.foreground": "#000000",
+			"editorLineNumber.foreground": "#858585",
+			"editorLineNumber.activeForeground": "#c6c6c6"
+		},
 		rules: [
 			{ token: "comment", foreground: "008000" },
 			{ token: "string", foreground: "A31515" },
@@ -357,13 +369,11 @@ function defineMonacoThemes() {
 
 function applyCodingState(codingState) {
 	if (!codingState) return;
-	if (["api", "vertex", "fragment"].includes(codingState.activeMode)) activeCodeMode = codingState.activeMode;
+	if (["api"].includes(codingState.activeMode)) activeCodeMode = codingState.activeMode;
 	if (monacoEditor) {
 		if (typeof codingState.apiSource === "string") codeModels.api.setValue(codingState.apiSource);
-		if (typeof codingState.vertexSource === "string") codeModels.vertex.setValue(codingState.vertexSource);
-		if (typeof codingState.fragmentSource === "string") codeModels.fragment.setValue(codingState.fragmentSource);
 	}
-	codeMode.value = activeCodeMode;
+
 	const selectedExample = Array.from(codeExample.options).some(option => option.value === codingState.example) ? codingState.example : "blank";
 	codeExample.value = selectedExample;
 	codeExample.hidden = activeCodeMode !== "api";
@@ -374,18 +384,8 @@ function applyCodingState(codingState) {
 		monacoEditor.setModel(codeModels[activeCodeMode]);
 		requestAnimationFrame(() => monacoEditor.layout());
 	}
-	shaderStatus.textContent = activeCodeMode === "api" ? "Coding ready" : "Shader editor ready";
+	codeStatus.textContent = "Coding ready";
 }
-
-codeMode.addEventListener("change", () => {
-	activeCodeMode = codeMode.value;
-	codeExample.value = "blank";
-	codeExample.hidden = activeCodeMode !== "api";
-	apiDocumentation.hidden = true;
-	apiDocumentationSeparator.hidden = true;
-	if (monacoEditor) monacoEditor.setModel(codeModels[activeCodeMode]);
-	shaderStatus.textContent = activeCodeMode === "api" ? "Coding ready" : "Shader editor ready";
-});
 
 codeExample.addEventListener("change", () => {
 	const showingDocumentation = codeExample.value === "api-documentation";
@@ -403,27 +403,18 @@ codeExample.addEventListener("change", () => {
 });
 
 runCodeButton.addEventListener("click", () => {
-	if (!shaderEditorReady) return;
 	if (activeCodeMode === "api") {
 		try {
 			const run = new Function("canvas", "currentDocument", monacoEditor.getValue());
 			run(canvas, canvasDocumentApi);
-			shaderStatus.textContent = "Code ran successfully";
+			codeStatus.textContent = "Code ran successfully";
+			setTimeout(() => codeStatus.textContent = "Coding ready", 2000);
 		} catch (error) {
-			shaderStatus.textContent = `Error: ${error.message}`;
+			codeStatus.textContent = `Error: ${error.message}`;
 			console.error(error);
 		}
 		return;
 	}
-	const nextVertex = codeModels.vertex.getValue();
-	const nextFragment = codeModels.fragment.getValue();
-	if (!compileShaderProgram(nextVertex, nextFragment)) {
-		shaderStatus.textContent = "Compile failed";
-		return;
-	}
-	vertexShaderString = nextVertex;
-	fragmentShaderString = nextFragment;
-	shaderStatus.textContent = "Shaders applied";
 });
 
 function getAppState() {
@@ -454,9 +445,7 @@ function getAppState() {
 			activeMode: activeCodeMode,
 			example: codeExample.value,
 			showDocumentation: !apiDocumentation.hidden,
-			apiSource: codeModels.api?.getValue() ?? restoredCodingState?.apiSource ?? apiExamples["add-points"].code,
-			vertexSource: codeModels.vertex?.getValue() ?? restoredCodingState?.vertexSource ?? vertexShaderString ?? "",
-			fragmentSource: codeModels.fragment?.getValue() ?? restoredCodingState?.fragmentSource ?? fragmentShaderString ?? ""
+			apiSource: codeModels.api?.getValue() ?? restoredCodingState?.apiSource ?? apiExamples["add-points"].code
 		}
 	};
 }
@@ -965,7 +954,7 @@ window.addEventListener("keydown", event => {
 	if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
 		event.preventDefault();
 		saveAppState();
-		shaderStatus.textContent = "Saved";
+		codeStatus.textContent = "Saved";
 	}
 }, true);
 

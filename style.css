@@ -52,12 +52,6 @@ body {
 	color: var(--foreground);
 }
 
-#toolbar {
-	background: var(--surface);
-	color: var(--foreground);
-	border-bottom: 1px solid var(--control-border);
-}
-
 select {
 	color: var(--foreground);
 	background: var(--control-background);
@@ -88,12 +82,17 @@ button {
 
 #toolbar {
 	display: flex;
+	justify-content: space-between;
     align-items: center;
-
+	
 	box-sizing: border-box;
 
+	border-bottom: 1px solid var(--control-border);
 	padding: 10px;
 	width: 100%;
+	
+	background: var(--surface);
+	color: var(--foreground);
 }
 
 select {
@@ -108,10 +107,6 @@ button {
 	width: 128px;
 	height: 32px;
 	border-radius: 16px;
-}
-
-#theme-toggle {
-	margin-left: auto;
 }
 
 #canv_info {
@@ -278,7 +273,7 @@ button {
 	padding-bottom: 6px;
 }
 
-#shader-editor {
+#code-editor {
 	flex: 1 1 auto;
 	min-height: 0px;
 }
@@ -352,13 +347,13 @@ button {
 	top: 50%;
 	right: 0px;
 	z-index: 5;
-	width: 24px;
-	height: 64px;
+	width: 16px;
+	height: 48px;
 	margin: -32px 0px 0px;
 	padding: 0px;
 	border-right: none;
-	border-radius: 12px 0px 0px 12px;
-	font-size: 22px;
+	border-radius: 4px 0px 0px 4px;
+	font-size: 13px;
 	line-height: 1;
 	cursor: pointer;
 	transition: right 160ms ease;
@@ -438,7 +433,6 @@ body > .context-view {
 #clear-vertices {
 	width: auto;
 	height: 24px;
-	margin: 0px;
 	padding: 0px 8px;
 	border-radius: 12px;
 	font-size: 12px;
@@ -529,10 +523,10 @@ body > .context-view {
 }
 
 .group-type {
-	width: 74px;
 	height: 24px;
 	border-radius: 12px;
 	font-size: 10px;
+	text-align: center;
 }
 
 .vertex-item {
@@ -571,7 +565,6 @@ body > .context-view {
 
 .vertex-item.is-selected {
 	border-color: var(--control-border);
-	background: var(--button-active);
 }
 
 .vertex-index {
@@ -613,16 +606,16 @@ body > .context-view {
 	top: 50%;
 	left: 0px;
 	z-index: 4;
-	width: 24px;
-	height: 64px;
+	width: 16px;
+	height: 48px;
 	margin: -32px 0px 0px;
 	padding: 0px;
 	border: 1px solid var(--control-border);
 	border-left: none;
-	border-radius: 0px 12px 12px 0px;
+	border-radius: 0px 4px 4px 0px;
 	background: var(--control-background);
 	color: var(--foreground);
-	font-size: 24px;
+	font-size: 13px;
 	line-height: 1;
 	cursor: pointer;
 	transition: left 160ms ease;
@@ -763,4 +756,10 @@ body > .context-view {
 	margin: 0px;
 	padding: 0px 14px;
 	cursor: pointer;
+}
+
+.round-button {
+	display: flex;
+	justify-content: center;
+	align-items: center;
 }
